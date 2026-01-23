@@ -1,132 +1,153 @@
 ﻿import streamlit as st
 from fpdf import FPDF
-from datetime import date
+from datetime import date, datetime
 
-st.set_page_config(page_title="Expediente Pediátrico Integral", layout="wide")
+# --- 1. CONFIGURACIÓN DE USUARIOS ---
+USUARIOS_AUTORIZADOS = {
+    "admin": "medico2024",
+    "doctor_perez": "pediatria2024"
+}
 
-# Estilo visual médico
-st.markdown("""
-    <style>
-    .main { background-color: #f8f9fa; }
-    .stTabs [data-baseweb="tab-list"] { gap: 10px; }
-    .stTabs [data-baseweb="tab"] { 
-        background-color: #e9ecef; 
-        border-radius: 5px; 
-        padding: 8px 16px;
-    }
-    </style>
-    """, unsafe_allow_html=True)
+def check_password():
+    if "password_correct" not in st.session_state:
+        st.title("🔐 Acceso al Sistema Médico")
+        user = st.text_input("Usuario", key="login_user")
+        pwd = st.text_input("Contraseña", type="password", key="login_pwd")
+        if st.button("Ingresar"):
+            if user in USUARIOS_AUTORIZADOS and USUARIOS_AUTORIZADOS[user] == pwd:
+                st.session_state["password_correct"] = True
+                st.session_state["user_actual"] = user
+                if "lista_pacientes" not in st.session_state:
+                    st.session_state["lista_pacientes"] = {}
+                if "paciente_seleccionado" not in st.session_state:
+                    st.session_state["paciente_seleccionado"] = None
+                st.rerun()
+            else:
+                st.error("❌ Usuario o contraseña incorrectos")
+        return False
+    return True
 
-st.title("🏥 Historia Clínica Pediátrica Integral")
+if check_password():
+    st.set_page_config(page_title="Gestión de Turno Pediátrico", layout="wide")
 
-# --- BARRA LATERAL: SOMATOMETRÍA Y SIGNOS VITALES ---
-with st.sidebar:
-    st.header("📊 Somatometría")
-    peso = st.text_input("Peso (kg):")
-    talla = st.text_input("Talla (cm):")
-    p_cef = st.text_input("Perímetro Cefálico (cm):")
-    p_abd = st.text_input("Perímetro Abdominal (cm):")
-    st.divider()
-    st.header("🌡️ Signos Vitales")
-    temp = st.text_input("Temperatura (°C):")
-    fc = st.text_input("FC (lpm):")
-    fr = st.text_input("FR (rpm):")
-    sat = st.text_input("Saturación O2 (%):")
-    ta = st.text_input("Tensión Arterial (mmHg):")
+    # --- 2. BARRA LATERAL: GESTIÓN DE PACIENTES ---
+    with st.sidebar:
+        st.write(f"👨‍⚕️ Médico: **{st.session_state['user_actual']}**")
+        if st.button("Cerrar Sesión"):
+            del st.session_state["password_correct"]
+            st.rerun()
+        
+        st.divider()
+        st.header("👥 Pacientes en Turno")
+        
+        if st.button("➕ AGREGAR NUEVO PACIENTE"):
+            nuevo_id = f"Paciente {len(st.session_state['lista_pacientes']) + 1}"
+            st.session_state["lista_pacientes"][nuevo_id] = {
+                "nombre": "", "f_nac": date(2020,1,1), "tutor": "",
+                "peso": "", "talla": "", "fc": "", "temp": "",
+                "notas_evolucion": [], "dx": "", "plan": "", "antecedentes": "",
+                "motivo": "", "exploracion": ""
+            }
+            st.session_state["paciente_seleccionado"] = nuevo_id
+            st.rerun()
 
-# --- CUERPO PRINCIPAL (TODOS LOS APARTADOS) ---
-tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
-    "👤 Identificación", 
-    "👶 Antecedentes", 
-    "🩺 Interrogatorio", 
-    "🔍 Exploración", 
-    "🔬 Auxiliares", 
-    "📝 Plan y Dx"
-])
+        nombres_pacientes = list(st.session_state["lista_pacientes"].keys())
+        if nombres_pacientes:
+            seleccion = st.selectbox("Seleccionar Paciente:", nombres_pacientes, 
+                                     index=nombres_pacientes.index(st.session_state["paciente_seleccionado"]) if st.session_state["paciente_seleccionado"] in nombres_pacientes else 0)
+            st.session_state["paciente_seleccionado"] = seleccion
+        
+        st.divider()
+        # --- NUEVO BOTÓN: RESUMEN DE TURNO ---
+        st.subheader("Reportes Finales")
+        if st.button("📑 GENERAR RESUMEN DE TURNO"):
+            if st.session_state["lista_pacientes"]:
+                pdf_turno = FPDF()
+                pdf_turno.add_page()
+                pdf_turno.set_font("Arial", 'B', 16)
+                pdf_turno.cell(0, 10, f"RESUMEN DE TURNO - {date.today()}", ln=True, align='C')
+                pdf_turno.set_font("Arial", size=10)
+                pdf_turno.cell(0, 10, f"Medico responsable: {st.session_state['user_actual']}", ln=True)
+                pdf_turno.ln(5)
 
-with tab1:
-    st.subheader("Ficha de Identificación")
-    c1, c2, c3 = st.columns(3)
-    nombre = c1.text_input("Nombre del Paciente:")
-    f_nac = c2.date_input("Fecha de Nacimiento:", value=date(2020,1,1))
-    sexo = c3.selectbox("Sexo:", ["Masculino", "Femenino"])
-    tutor = c1.text_input("Nombre del Padre/Madre/Tutor:")
-    parentesco = c2.text_input("Parentesco:")
-    telefono = c3.text_input("Teléfono:")
-    domicilio = st.text_area("Domicilio:")
+                for pid, pdata in st.session_state["lista_pacientes"].items():
+                    nombre_p = pdata['nombre'] if pdata['nombre'] else pid
+                    pdf_turno.set_font("Arial", 'B', 12)
+                    pdf_turno.cell(0, 10, f"PACIENTE: {nombre_p}", ln=True)
+                    pdf_turno.set_font("Arial", size=10)
+                    pdf_turno.multi_cell(0, 7, f"DX: {pdata['dx']}\nPLAN: {pdata['plan']}")
+                    pdf_turno.ln(3)
+                    pdf_turno.cell(0, 0, "", "T", ln=True) # Línea divisoria
+                
+                pdf_turno.output("Resumen_Turno_Completo.pdf")
+                st.sidebar.success("✅ Resumen de turno generado.")
+            else:
+                st.sidebar.warning("No hay pacientes registrados.")
 
-with tab2:
-    col_ant1, col_ant2 = st.columns(2)
-    with col_ant1:
-        st.subheader("Antecedentes Perinatales")
-        gestas = st.text_input("No. Gesta / Para / Abortos:")
-        evol_preg = st.text_area("Evolución del embarazo:")
-        tipo_p = st.selectbox("Tipo de Parto:", ["Eutócico", "Cesárea", "Fórceps"])
-        apgar = st.text_input("APGAR (1'/5'):")
-        silverman = st.text_input("Silverman-Andersen:")
-        hosp_rn = st.text_area("Hospitalización del RN / Complicaciones:")
-    with col_ant2:
-        st.subheader("Antecedentes Familiares")
-        st.write("Marque antecedentes positivos:")
-        c_ahf1, c_ahf2 = st.columns(2)
-        diab = c_ahf1.checkbox("Diabetes Mellitus")
-        hta = c_ahf2.checkbox("Hipertensión Arterial")
-        neoplasia = c_ahf1.checkbox("Cáncer / Neoplasias")
-        alergia = c_ahf2.checkbox("Alergias Familiares")
-        ahf_detalles = st.text_area("Detalle de AHF y parentesco:")
+    # --- 3. CARGA DE DATOS DEL PACIENTE SELECCIONADO ---
+    if not st.session_state["lista_pacientes"]:
+        st.info("Haga clic en 'Agregar Nuevo Paciente' para comenzar.")
+        st.stop()
 
-with tab3:
-    st.subheader("Interrogatorio por Aparatos y Sistemas")
-    col_sys1, col_sys2 = st.columns(2)
-    with col_sys1:
-        motivo = st.text_area("Motivo de consulta / Padecimiento actual:")
-        digestivo = st.text_area("Aparato Digestivo:")
-        respiratorio = st.text_area("Aparato Respiratorio:")
-    with col_sys2:
-        cardio = st.text_area("Aparato Cardiovascular:")
-        neuro = st.text_area("Neurológico y Desarrollo Psicomotor:")
-        inmuno = st.text_area("Inmunizaciones (Esquema de vacunas):")
+    p_id = st.session_state["paciente_seleccionado"]
+    p_data = st.session_state["lista_pacientes"][p_id]
 
-with tab4:
-    st.subheader("Exploración Física Detallada")
-    habitus = st.text_area("Habitus Exterior:")
-    cabeza = st.text_area("Cabeza y Cuello (Fontanelas, ojos, oídos, faringe):")
-    torax = st.text_area("Tórax (Campos pulmonares, ruidos cardiacos):")
-    abdomen = st.text_area("Abdomen (Masas, visceromegalias, ruidos):")
-    extremidades = st.text_area("Extremidades y Columna:")
-    genitales = st.text_area("Genitales y Ano:")
+    st.title(f"🏥 Expediente: {p_data['nombre'] if p_data['nombre'] else p_id}")
 
-with tab5:
-    st.subheader("Auxiliares de Diagnóstico")
-    laboratorio = st.text_area("Resultados de Laboratorio:")
-    gabinete = st.text_area("Estudios de Gabinete (RX, USG, etc.):")
+    tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
+        "👤 Identificación", "👶 Antecedentes", "🩺 Interrogatorio", 
+        "🔍 Exploración", "📝 Plan y Dx", "📈 Evolución"
+    ])
 
-with tab6:
-    st.subheader("Conclusiones Médicas")
-    dx = st.text_area("Impresión Diagnóstica:")
-    tratamiento = st.text_area("Plan Terapéutico y Medicación:")
-    pronostico = st.text_input("Pronóstico:")
-    
-    if st.button("💾 GENERAR EXPEDIENTE PDF"):
-        if nombre:
+    with tab1:
+        st.subheader("Ficha de Identificación")
+        p_data['nombre'] = st.text_input("Nombre Completo:", value=p_data['nombre'])
+        c1, c2 = st.columns(2)
+        p_data['f_nac'] = c1.date_input("Fecha de Nacimiento:", value=p_data['f_nac'])
+        p_data['tutor'] = c2.text_input("Padre o Tutor:", value=p_data['tutor'])
+        st.divider()
+        st.subheader("Somatometría")
+        cs1, cs2, cs3 = st.columns(3)
+        p_data['peso'] = cs1.text_input("Peso (kg):", value=p_data['peso'])
+        p_data['talla'] = cs2.text_input("Talla (cm):", value=p_data['talla'])
+        p_data['temp'] = cs3.text_input("Temp (°C):", value=p_data['temp'])
+
+    with tab2:
+        p_data['antecedentes'] = st.text_area("Heredofamiliares y Perinatales:", value=p_data['antecedentes'])
+
+    with tab3:
+        p_data['motivo'] = st.text_area("Padecimiento actual:", value=p_data['motivo'])
+
+    with tab4:
+        p_data['exploracion'] = st.text_area("Hallazgos físicos:", value=p_data['exploracion'])
+
+    with tab5:
+        p_data['dx'] = st.text_area("Diagnóstico:", value=p_data['dx'])
+        p_data['plan'] = st.text_area("Plan Terapéutico:", value=p_data['plan'])
+
+    with tab6:
+        st.subheader("Notas de Evolución")
+        nueva_n = st.text_area("Escribir nota:", key=f"new_note_{p_id}")
+        if st.button("➕ Guardar Nota"):
+            if nueva_n:
+                ahora = datetime.now().strftime("%d/%m/%Y %H:%M")
+                p_data["notas_evolucion"].insert(0, {"fecha": ahora, "texto": nueva_n})
+                st.rerun()
+        for n in p_data["notas_evolucion"]:
+            st.info(f"📅 {n['fecha']}\n\n{n['texto']}")
+
+    # --- 5. PDF INDIVIDUAL ---
+    if st.button("💾 GENERAR PDF DE ESTE PACIENTE"):
+        if p_data['nombre']:
             pdf = FPDF()
             pdf.add_page()
             pdf.set_font("Arial", 'B', 16)
-            pdf.cell(0, 10, "HISTORIA CLINICA PEDIATRICA", ln=True, align='C')
+            pdf.cell(0, 10, f"HISTORIA CLINICA - {p_data['nombre']}", ln=True, align='C')
             pdf.set_font("Arial", size=10)
             pdf.ln(5)
-            # Resumen de datos en el PDF
-            pdf.cell(0, 8, f"PACIENTE: {nombre} | SEXO: {sexo} | FECHA NAC: {f_nac}", ln=True)
-            pdf.cell(0, 8, f"PESO: {peso}kg | TALLA: {talla}cm | FC: {fc} | TEMP: {temp}", ln=True)
+            pdf.cell(0, 8, f"Fecha: {date.today()} | Medico: {st.session_state['user_actual']}", ln=True)
             pdf.ln(5)
-            pdf.set_font("Arial", 'B', 12)
-            pdf.cell(0, 10, "DIAGNOSTICO Y PLAN", ln=True)
-            pdf.set_font("Arial", size=10)
-            pdf.multi_cell(0, 7, f"Dx: {dx}")
-            pdf.multi_cell(0, 7, f"Plan: {tratamiento}")
-            
-            nombre_f = f"HC_{nombre.replace(' ', '_')}.pdf"
-            pdf.output(nombre_f)
-            st.success(f"✅ ¡Expediente de {nombre} guardado!")
-        else:
-            st.error("Error: El nombre es obligatorio.")
+            pdf.multi_cell(0, 7, f"DIAGNOSTICO: {p_data['dx']}\nPLAN: {p_data['plan']}")
+            pdf.output(f"HC_{p_data['nombre']}.pdf")
+            st.success("PDF individual generado.")
+
