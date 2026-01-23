@@ -90,6 +90,17 @@ if login_registro():
         lista_p = list(st.session_state["lista_pacientes"].keys())
         if lista_p:
             st.session_state["paciente_seleccionado"] = st.selectbox("Expediente:", lista_p)
+            st.divider()
+            # BOTÓN DE RESUMEN DE TURNO RECUPERADO
+            if st.button("📊 Generar Resumen de Turno"):
+                pdf_r = PEDIATRIC_PDF()
+                pdf_r.add_page()
+                pdf_r.section_title("Resumen General de Guardia")
+                for pid, pdata in st.session_state["lista_pacientes"].items():
+                    pdf_r.add_field("PACIENTE", f"{pdata['nombre']} ({pdata['edad']})")
+                    pdf_r.add_field("DIAGNÓSTICO", pdata['dx'])
+                    pdf_r.ln(2)
+                st.download_button("Descargar Resumen", pdf_r.output(dest='S').encode('latin-1'), "Resumen_Turno.pdf")
 
     if st.session_state.get("paciente_seleccionado"):
         pac = st.session_state["lista_pacientes"][st.session_state["paciente_seleccionado"]]
@@ -97,7 +108,7 @@ if login_registro():
 
         t = st.tabs(["Filiación/Signos", "Antecedentes", "Sistemas", "Exploración", "DX/Plan", "Evolución"])
 
-        with t[0]: # FILIACIÓN Y SIGNOS ACTUALIZADO
+        with t[0]: 
             st.subheader("Datos de Filiación")
             pac['nombre'] = st.text_input("Nombre Completo del Paciente:", value=pac['nombre'])
             c1, c2, c3 = st.columns(3)
@@ -113,67 +124,108 @@ if login_registro():
             
             st.divider()
             c7, c8, c9 = st.columns(3)
-            pac['telefono'], pac['religion'] = c7.text_input("Teléfono:"), c8.text_input("Religión:")
-            pac['domicilio'] = st.text_input("Domicilio:")
-            pac['originario'], pac['residente'] = st.columns(2)[0].text_input("Originario:"), st.columns(2)[1].text_input("Residente:")
+            pac['telefono'] = c7.text_input("Teléfono:", value=pac['telefono'])
+            pac['religion'] = c8.text_input("Religión:", value=pac['religion'])
+            pac['domicilio'] = st.text_input("Domicilio:", value=pac['domicilio'])
+            
+            col_or, col_res = st.columns(2)
+            pac['originario'] = col_or.text_input("Originario de:", value=pac['originario'])
+            pac['residente'] = col_res.text_input("Residente de:", value=pac['residente'])
 
             st.subheader("Signos Vitales y Somatometría")
             s1, s2, s3, s4 = st.columns(4)
-            pac['fc'], pac['fr'], pac['sat'], pac['temp'] = s1.text_input("FC:"), s2.text_input("FR:"), s3.text_input("SatO2:"), s4.text_input("Temp:")
+            pac['fc'], pac['fr'], pac['sat'], pac['temp'] = s1.text_input("FC:", value=pac['fc']), s2.text_input("FR:", value=pac['fr']), s3.text_input("SatO2:", value=pac['sat']), s4.text_input("Temp:", value=pac['temp'])
             s5, s6, s7, s8 = st.columns(4)
-            pac['ta'], pac['glu'], pac['peso'], pac['talla'] = s5.text_input("TA:"), s6.text_input("Glu:"), s7.text_input("Peso (kg):"), s8.text_input("Talla (cm):")
+            pac['ta'], pac['glu'], pac['peso'], pac['talla'] = s5.text_input("TA:", value=pac['ta']), s6.text_input("Glucosa:", value=pac['glu']), s7.text_input("Peso (kg):", value=pac['peso']), s8.text_input("Talla (cm):", value=pac['talla'])
 
-        with t[1]: # ANTECEDENTES
+        with t[1]: # ANTECEDENTES (3 COLUMNAS)
             c1, c2, c3 = st.columns(3)
-            pac['ahf'], pac['vacunas'] = c1.text_area("Heredofamiliares:"), c1.text_area("Vacunas:")
-            pac['prenatales'], pac['alimentacion'] = c2.text_area("Prenatales:"), c2.text_area("Alimentación:")
-            pac['natales'] = c3.text_area("Natales:")
-            pac['apgar'], pac['silverman'] = c3.text_input("APGAR:"), c3.text_input("Silverman:")
-            pac['desarrollo'], pac['patologicos'] = c3.text_area("Desarrollo:"), st.text_area("Patológicos:")
+            pac['ahf'] = c1.text_area("Heredofamiliares:", value=pac['ahf'])
+            pac['vacunas'] = c1.text_area("Vacunas / Tamiz:", value=pac['vacunas'])
+            pac['prenatales'] = c2.text_area("Prenatales:", value=pac['prenatales'])
+            pac['alimentacion'] = c2.text_area("Alimentación:", value=pac['alimentacion'])
+            pac['natales'] = c3.text_area("Natales (Parto):", value=pac['natales'])
+            pac['apgar'] = c3.text_input("APGAR:", value=pac['apgar'])
+            pac['silverman'] = c3.text_input("Silverman:", value=pac['silverman'])
+            pac['desarrollo'] = c3.text_area("Hitos Desarrollo:", value=pac['desarrollo'])
+            pac['patologicos'] = st.text_area("Antecedentes Patológicos (Alergias, Qx, Transfusionales):", value=pac['patologicos'])
 
-        with t[2]: # SISTEMAS
-            pac['motivo'] = st.text_area("Padecimiento Actual:")
+        with t[2]: # INTERROGATORIO POR SISTEMAS
+            pac['motivo'] = st.text_area("Padecimiento Actual:", value=pac['motivo'])
             a1, a2 = st.columns(2)
-            pac['as_digestivo'], pac['as_resp'] = a1.text_area("Digestivo:"), a2.text_area("Respiratorio:")
-            pac['as_cardio'], pac['as_neuro'] = a1.text_area("Cardio:"), a2.text_area("Neuro:")
-            pac['as_urinario'], pac['as_piel'] = a1.text_area("Urinario:"), a2.text_area("Piel:")
-            pac['as_musculo'] = st.text_area("Músculo-Esquelético:")
+            pac['as_digestivo'], pac['as_resp'] = a1.text_area("A. Digestivo:", value=pac['as_digestivo']), a2.text_area("A. Respiratorio:", value=pac['as_resp'])
+            pac['as_cardio'], pac['as_neuro'] = a1.text_area("A. Cardiovascular:", value=pac['as_cardio']), a2.text_area("A. Neurológico:", value=pac['as_neuro'])
+            pac['as_urinario'], pac['as_piel'] = a1.text_area("A. Genitourinario:", value=pac['as_urinario']), a2.text_area("Piel y Faneras:", value=pac['as_piel'])
+            pac['as_musculo'] = st.text_area("Músculo-Esquelético:", value=pac['as_musculo'])
 
         with t[3]: # EXPLORACIÓN
-            pac['exploracion'] = st.text_area("Exploración Física:", height=300)
+            pac['exploracion'] = st.text_area("Exploración Física Cefalo-Caudal:", value=pac['exploracion'], height=300)
 
-        with t[4]: # DX Y PLAN
-            pac['dx'], pac['plan'] = st.text_area("Diagnóstico:", height=150), st.text_area("Plan:", height=200)
-            if st.button("🖨️ GENERAR PDF HISTORIA CLINICA"):
+        with t[4]: # DX Y PLAN CON VACIADO COMPLETO
+            pac['dx'] = st.text_area("Impresión Diagnóstica:", value=pac['dx'], height=150)
+            pac['plan'] = st.text_area("Plan de Manejo:", value=pac['plan'], height=200)
+            
+            if st.button("🖨️ GENERAR HISTORIA CLINICA COMPLETA"):
                 pdf = PEDIATRIC_PDF()
                 pdf.add_page()
-                pdf.section_title("1. Filiación e Interrogatorio")
-                pdf.add_field("Paciente", pac['nombre']); pdf.add_field("Edad/Sexo", f"{pac['edad']} / {pac['sexo']}")
+                
+                # SECCIÓN 1: FILIACIÓN (MAPEO COMPLETO)
+                pdf.section_title("1. Datos de Filiación e Interrogatorio")
+                pdf.add_field("Paciente", pac['nombre'])
+                pdf.add_field("Edad / Sexo", f"{pac['edad']} / {pac['sexo']}")
                 pdf.add_field("Interrogatorio", f"{pac['tipo_interrogatorio']} (Informante: {pac['informante']} - {pac['parentesco']})")
-                pdf.add_field("Domicilio", pac['domicilio'])
-                pdf.section_title("2. Somatometría y Signos")
-                pdf.add_field("Signos", f"FC:{pac['fc']} FR:{pac['fr']} Sat:{pac['sat']} T:{pac['temp']} TA:{pac['ta']}")
-                pdf.add_field("Somatometría", f"Peso:{pac['peso']}kg Talla:{pac['talla']}cm Glu:{pac['glu']}")
-                pdf.section_title("3. Exploración Física")
-                pdf.add_field("Detalle", pac['exploracion'])
-                pdf.section_title("4. Diagnóstico y Plan")
-                pdf.add_field("DX", pac['dx']); pdf.add_field("PLAN", pac['plan'])
-                st.download_button("Descargar HC", pdf.output(dest='S').encode('latin-1'), f"HC_{pac['nombre']}.pdf")
+                pdf.add_field("Ubicación", f"Origen: {pac['originario']} | Residente: {pac['residente']}")
+                pdf.add_field("Contacto/Religión", f"Tel: {pac['telefono']} | Religión: {pac['religion']}")
+                
+                # SECCIÓN 2: SIGNOS (MAPEO COMPLETO)
+                pdf.section_title("2. Signos Vitales y Somatometría")
+                pdf.add_field("Vitales", f"FC: {pac['fc']} | FR: {pac['fr']} | Sat: {pac['sat']} | Temp: {pac['temp']} | TA: {pac['ta']}")
+                pdf.add_field("Somatometría", f"Peso: {pac['peso']} kg | Talla: {pac['talla']} cm | Glu: {pac['glu']} mg/dL")
+                
+                # SECCIÓN 3: ANTECEDENTES (MAPEO COMPLETO)
+                pdf.section_title("3. Antecedentes")
+                pdf.add_field("Hereditarios", pac['ahf'])
+                pdf.add_field("Prenatales/Alimentación", f"{pac['prenatales']} | {pac['alimentacion']}")
+                pdf.add_field("Perinatales", f"Parto: {pac['natales']} | APGAR: {pac['apgar']} | SV: {pac['silverman']}")
+                pdf.add_field("Desarrollo/Vacunas", f"Hitos: {pac['desarrollo']} | Vacunas: {pac['vacunas']}")
+                pdf.add_field("Patológicos", pac['patologicos'])
+                
+                # SECCIÓN 4: PADECIMIENTO Y SISTEMAS (MAPEO COMPLETO)
+                pdf.section_title("4. Interrogatorio por Sistemas")
+                pdf.add_field("Padecimiento Actual", pac['motivo'])
+                pdf.add_field("Sistemas", f"Digestivo: {pac['as_digestivo']} | Resp: {pac['as_resp']} | Cardio: {pac['as_cardio']} | Neuro: {pac['as_neuro']} | Genitourinario: {pac['as_urinario']} | Piel: {pac['as_piel']} | Musculoesq: {pac['as_musculo']}")
+                
+                # SECCIÓN 5: EXPLORACIÓN (MAPEO COMPLETO)
+                pdf.section_title("5. Exploración Física")
+                pdf.add_field("Hallazgos", pac['exploracion'])
+                
+                # SECCIÓN 6: DX Y PLAN (MAPEO COMPLETO)
+                pdf.section_title("6. Diagnóstico y Plan")
+                pdf.add_field("Impresión Diagnóstica", pac['dx'])
+                pdf.add_field("Plan de Manejo", pac['plan'])
+                
+                st.download_button("Descargar Historia Clínica", pdf.output(dest='S').encode('latin-1'), f"HC_{pac['nombre']}.pdf")
 
-        with t[5]: # EVOLUCIÓN CON ESTILO
-            st.subheader("Notas de Evolución")
-            nueva = st.text_area("Escribir nota:")
+        with t[5]: # EVOLUCIÓN
+            st.subheader("Seguimiento del Paciente")
+            nueva = st.text_area("Escribir nota de evolución:")
             if st.button("💾 Guardar Nota"):
                 if nueva:
                     pac["notas_evolucion"].insert(0, {"f": datetime.now().strftime("%d/%m/%Y %H:%M"), "t": nueva})
                     st.rerun()
+            
             if pac["notas_evolucion"] and st.button("📄 GENERAR PDF DE NOTAS"):
                 pdf_e = PEDIATRIC_PDF()
                 pdf_e.add_page()
                 pdf_e.section_title(f"HISTORIAL DE EVOLUCION: {pac['nombre']}")
                 for n in pac["notas_evolucion"]:
-                    pdf_e.set_font('Arial', 'B', 10); pdf_e.cell(0, 7, f"Fecha: {n['f']}", 0, 1)
-                    pdf_e.set_font('Arial', '', 10); pdf_e.multi_cell(0, 6, n['t'])
-                    pdf_e.ln(4); pdf_e.line(10, pdf_e.get_y(), 200, pdf_e.get_y())
-                st.download_button("Descargar Notas", pdf_e.output(dest='S').encode('latin-1'), f"Notas_{pac['nombre']}.pdf")
-            for n in pac["notas_evolucion"]: st.info(f"📅 {n['f']}\n{n['t']}")
+                    pdf_e.set_font('Arial', 'B', 10)
+                    pdf_e.cell(0, 7, f"Fecha: {n['f']}", 0, 1)
+                    pdf_e.set_font('Arial', '', 10)
+                    pdf_e.multi_cell(0, 6, n['t'])
+                    pdf_e.ln(4)
+                    pdf_e.line(10, pdf_e.get_y(), 200, pdf_e.get_y())
+                st.download_button("Descargar Notas", pdf_e.output(dest='S').encode('latin-1'), f"Evolucion_{pac['nombre']}.pdf")
+            
+            for n in pac["notas_evolucion"]:
+                st.info(f"📅 {n['f']}\n{n['t']}")
