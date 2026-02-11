@@ -1,0 +1,12 @@
+[theme]
+primaryColor = "#2563EB" # Azul médico vibrante para acciones
+backgroundColor = "#F8FAFC" # Fondo grisáceo ultra-limpio (evita la fatiga visual)
+secondaryBackgroundColor = "#FFFFFF" # Color de las tarjetas y sidebar
+textColor = "#0F172A" # Azul casi negro para máxima legibilidad
+font = "sans serif"
+
+[ui]
+displayMode = "light" # Forzamos modo claro para mantener la estética clínica
+
+[browser]
+gatherUsageStats = false
