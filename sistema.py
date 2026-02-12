@@ -4,27 +4,24 @@ from datetime import date, datetime
 import io
 import json
 import os
-# IMPORTA LAS FUNCIONES DE TU ARCHIVO interface_premium.py
 from interface_premium import cargar_estilo_hospital
 
-# --- CONFIGURACIÓN DE PÁGINA ---
+# --- CONFIGURACIÓN ---
 st.set_page_config(page_title="Gestión Hospitalaria Pediátrica", layout="wide", page_icon="🏥")
 cargar_estilo_hospital()
 
-# --- PERSISTENCIA DE USUARIOS ---
+# --- PERSISTENCIA USUARIOS ---
 def cargar_usuarios():
     if os.path.exists("usuarios.json"):
-        with open("usuarios.json", "r") as f:
-            return json.load(f)
+        with open("usuarios.json", "r") as f: return json.load(f)
     return {"admin": "medico2026"}
 
-def guardar_usuario(usuario, password):
-    usuarios = cargar_usuarios()
-    usuarios[usuario] = password
-    with open("usuarios.json", "w") as f:
-        json.dump(usuarios, f)
+def guardar_usuario(u, p):
+    db = cargar_usuarios()
+    db[u] = p
+    with open("usuarios.json", "w") as f: json.dump(db, f)
 
-# --- MOTOR DE PDF CON ESTILO MÉDICO PROFESIONAL ---
+# --- MOTOR PDF ---
 class PEDIATRIC_PDF(FPDF):
     def header(self):
         self.set_font('Arial', 'B', 16)
@@ -50,50 +47,38 @@ class PEDIATRIC_PDF(FPDF):
         self.set_text_color(0, 0, 0)
         self.write(6, f"{str(value)}\n")
 
-    def footer(self):
-        self.set_y(-15)
-        self.set_font('Arial', 'I', 8)
-        self.set_text_color(128, 128, 128)
-        self.cell(0, 10, f'Página {self.page_no()} - Confidencialidad Médica', 0, 0, 'C')
-
-# --- LÓGICA DE ACCESO ---
+# --- LOGIN / REGISTRO ---
 def login_registro():
-    if "db_usuarios" not in st.session_state:
-        st.session_state["db_usuarios"] = cargar_usuarios()
-
+    if "db_usuarios" not in st.session_state: st.session_state["db_usuarios"] = cargar_usuarios()
     if "password_correct" not in st.session_state:
-        col1, col2, col3 = st.columns([1,2,1])
-        with col2:
+        c1, c2, c3 = st.columns([1,2,1])
+        with c2:
             with st.container(border=True):
                 st.title("📂 Expediente Médico")
                 choice = st.radio("Acceso", ["Iniciar Sesión", "Registrarse"], horizontal=True)
+                u = st.text_input("Usuario")
+                p = st.text_input("Contraseña", type="password")
                 if choice == "Iniciar Sesión":
-                    u = st.text_input("Usuario")
-                    p = st.text_input("Contraseña", type="password")
-                    if st.button("Ingresar", use_container_width=True, type="primary"):
+                    if st.button("🚀 Ingresar", use_container_width=True, type="primary"):
                         if u in st.session_state["db_usuarios"] and st.session_state["db_usuarios"][u] == p:
-                            st.session_state["password_correct"] = True
-                            st.session_state["user_actual"] = u
+                            st.session_state["password_correct"], st.session_state["user_actual"] = True, u
                             if "lista_pacientes" not in st.session_state: st.session_state["lista_pacientes"] = {}
                             st.rerun()
-                        else: st.error("Acceso denegado")
+                        else: st.error("Error de acceso")
                 else:
-                    nu = st.text_input("Nuevo Usuario")
-                    np = st.text_input("Contraseña", type="password")
-                    if st.button("Crear Cuenta", use_container_width=True):
-                        guardar_usuario(nu, np)
+                    if st.button("➕ Crear Cuenta", use_container_width=True):
+                        guardar_usuario(u, p)
                         st.session_state["db_usuarios"] = cargar_usuarios()
                         st.success("Usuario creado")
         return False
     return True
 
-# --- APP PRINCIPAL ---
+# --- APP ---
 if login_registro():
     with st.sidebar:
         st.write(f"🩺 Dr(a). **{st.session_state['user_actual']}**")
-        if st.button("Cerrar Sesión", use_container_width=True):
-            del st.session_state["password_correct"]
-            st.rerun()
+        if st.button("🚪 Cerrar Sesión", use_container_width=True):
+            del st.session_state["password_correct"]; st.rerun()
         st.divider()
         if st.button("➕ NUEVO PACIENTE", type="primary", use_container_width=True):
             p_id = f"PAC-{datetime.now().strftime('%H%M%S')}"
@@ -108,135 +93,71 @@ if login_registro():
                 "as_urinario": "", "as_piel": "", "as_musculo": "", "exploracion": "", 
                 "dx": "", "plan": "", "notas_evolucion": []
             }
-            st.session_state["paciente_seleccionado"] = p_id
-            st.rerun()
+            st.session_state["paciente_seleccionado"] = p_id; st.rerun()
         
         lista_p = list(st.session_state["lista_pacientes"].keys())
         if lista_p:
             st.session_state["paciente_seleccionado"] = st.selectbox("Expediente:", lista_p)
-            st.divider()
-            if st.button("📊 Generar Resumen de Turno", use_container_width=True):
-                pdf_r = PEDIATRIC_PDF()
-                pdf_r.add_page()
-                pdf_r.section_title("Resumen General de Guardia")
+            if st.button("📊 Generar Resumen", use_container_width=True):
+                pdf_r = PEDIATRIC_PDF(); pdf_r.add_page(); pdf_r.section_title("Resumen Guardia")
                 for pid, pdata in st.session_state["lista_pacientes"].items():
-                    pdf_r.add_field("PACIENTE", f"{pdata['nombre']} ({pdata['edad']})")
-                    pdf_r.add_field("DIAGNÓSTICO", pdata['dx'])
-                    pdf_r.ln(2)
-                st.download_button("Descargar Resumen", pdf_r.output(dest='S').encode('latin-1'), "Resumen_Turno.pdf")
+                    pdf_r.add_field("PACIENTE", f"{pdata['nombre']}"); pdf_r.ln(2)
+                st.download_button("📥 Descargar", pdf_r.output(dest='S').encode('latin-1'), "Resumen.pdf")
 
     if st.session_state.get("paciente_seleccionado"):
         pac = st.session_state["lista_pacientes"][st.session_state["paciente_seleccionado"]]
         st.header(f"🧑‍⚕️ {pac['nombre'] if pac['nombre'] else 'Paciente Nuevo'}")
 
-        t = st.tabs(["Filiación/Signos", "Antecedentes", "Sistemas", "Exploración", "DX/Plan", "Evolución"])
+        t = st.tabs(["📋 Filiación/Signos", "🧬 Antecedentes", "🫁 Sistemas", "🔍 Exploración", "📝 DX/Plan", "📈 Evolución"])
 
-        with t[0]: # FILIACIÓN Y SIGNOS
+        with t[0]: # FILIACIÓN
             with st.container(border=True):
                 st.subheader("Datos de Filiación")
-                pac['nombre'] = st.text_input("Nombre Completo del Paciente:", value=pac['nombre'])
+                pac['nombre'] = st.text_input("Nombre Completo:", value=pac['nombre'])
                 c1, c2, c3 = st.columns(3)
-                pac['f_nac'] = c1.date_input("Fecha de Nacimiento:", pac['f_nac'])
-                pac['edad'] = c2.text_input("Edad:", value=pac['edad'])
-                pac['sexo'] = c3.selectbox("Sexo:", ["M", "F"], index=0 if pac['sexo']=="M" else 1)
-                
+                pac['f_nac'], pac['edad'], pac['sexo'] = c1.date_input("Nacimiento:", pac['f_nac']), c2.text_input("Edad:", value=pac['edad']), c3.selectbox("Sexo:", ["M", "F"], index=0 if pac['sexo']=="M" else 1)
                 st.divider()
                 c4, c5, c6 = st.columns(3)
-                pac['tipo_interrogatorio'] = c4.selectbox("Tipo de Interrogatorio:", ["Directo", "Indirecto", "Mixto"])
-                pac['informante'] = c5.text_input("Nombre del Informante (si aplica):", value=pac['informante'])
-                pac['parentesco'] = c6.text_input("Parentesco/Relación:", value=pac['parentesco'])
-                
-                st.divider()
-                c7, c8, c9 = st.columns([1,1,2])
-                pac['telefono'] = c7.text_input("Teléfono:", value=pac['telefono'])
-                pac['religion'] = c8.text_input("Religión:", value=pac['religion'])
-                pac['domicilio'] = c9.text_input("Domicilio:", value=pac['domicilio'])
-                
-                col_or, col_res = st.columns(2)
-                pac['originario'] = col_or.text_input("Originario de:", value=pac['originario'])
-                pac['residente'] = col_res.text_input("Residente de:", value=pac['residente'])
-
+                pac['tipo_interrogatorio'], pac['informante'], pac['parentesco'] = c4.selectbox("Interrogatorio:", ["Directo", "Indirecto", "Mixto"]), c5.text_input("Informante:"), c6.text_input("Relación:")
             with st.container(border=True):
-                st.subheader("Signos Vitales y Somatometría")
+                st.subheader("Signos Vitales")
                 s1, s2, s3, s4 = st.columns(4)
-                pac['fc'] = s1.text_input("FC:", value=pac['fc'])
-                pac['fr'] = s2.text_input("FR:", value=pac['fr'])
-                pac['sat'] = s3.text_input("SatO2:", value=pac['sat'])
-                pac['temp'] = s4.text_input("Temp:", value=pac['temp'])
-                s5, s6, s7, s8 = st.columns(4)
-                pac['ta'] = s5.text_input("TA:", value=pac['ta'])
-                pac['glu'] = s6.text_input("Glucosa:", value=pac['glu'])
-                pac['peso'] = s7.text_input("Peso (kg):", value=pac['peso'])
-                pac['talla'] = s8.text_input("Talla (cm):", value=pac['talla'])
+                pac['fc'], pac['fr'], pac['sat'], pac['temp'] = s1.text_input("FC:"), s2.text_input("FR:"), s3.text_input("SatO2:"), s4.text_input("Temp:")
 
-        with t[1]: # ANTECEDENTES REINTEGRADOS
+        with t[1]: # ANTECEDENTES
             with st.container(border=True):
-                st.subheader("Antecedentes Completos")
                 c1, c2, c3 = st.columns(3)
-                with c1:
-                    pac['ahf'] = st.text_area("Heredofamiliares:", value=pac['ahf'])
-                    pac['vacunas'] = st.text_area("Vacunas / Tamiz:", value=pac['vacunas'])
-                with c2:
-                    pac['prenatales'] = st.text_area("Prenatales:", value=pac['prenatales'])
-                    pac['alimentacion'] = st.text_area("Alimentación:", value=pac['alimentacion'])
-                with c3:
-                    pac['natales'] = st.text_area("Natales (Parto):", value=pac['natales'])
-                    pac['desarrollo'] = st.text_area("Hitos Desarrollo:", value=pac['desarrollo'])
-                
-                st.divider()
-                c_a, c_s = st.columns(2)
-                pac['apgar'] = c_a.text_input("APGAR:", value=pac['apgar'])
-                pac['silverman'] = c_s.text_input("Silverman:", value=pac['silverman'])
-                pac['patologicos'] = st.text_area("Antecedentes Patológicos (Alergias, Qx, Transfusionales):", value=pac['patologicos'])
+                pac['ahf'] = c1.text_area("Heredofamiliares:", value=pac['ahf'])
+                pac['vacunas'] = c1.text_area("Vacunas:", value=pac['vacunas'])
+                pac['prenatales'] = c2.text_area("Prenatales:", value=pac['prenatales'])
+                pac['alimentacion'] = c2.text_area("Alimentación:", value=pac['alimentacion'])
+                pac['natales'] = c3.text_area("Natales:", value=pac['natales'])
+                pac['desarrollo'] = c3.text_area("Hitos Desarrollo:", value=pac['desarrollo'])
 
-        with t[2]: # SISTEMAS REINTEGRADOS
+        with t[2]: # SISTEMAS
             with st.container(border=True):
                 pac['motivo'] = st.text_area("Padecimiento Actual:", value=pac['motivo'])
-                st.divider()
                 a1, a2 = st.columns(2)
-                pac['as_digestivo'] = a1.text_area("A. Digestivo:", value=pac['as_digestivo'])
-                pac['as_resp'] = a2.text_area("A. Respiratorio:", value=pac['as_resp'])
-                pac['as_cardio'] = a1.text_area("A. Cardiovascular:", value=pac['as_cardio'])
-                pac['as_neuro'] = a2.text_area("A. Neurológico:", value=pac['as_neuro'])
-                pac['as_urinario'] = a1.text_area("A. Genitourinario:", value=pac['as_urinario'])
-                pac['as_piel'] = a2.text_area("Piel y Faneras:", value=pac['as_piel'])
-                pac['as_musculo'] = st.text_area("Músculo-Esquelético:", value=pac['as_musculo'])
+                pac['as_digestivo'], pac['as_resp'] = a1.text_area("Digestivo:"), a2.text_area("Respiratorio:")
 
         with t[3]: # EXPLORACIÓN
             with st.container(border=True):
-                pac['exploracion'] = st.text_area("Exploración Física Cefalo-Caudal:", value=pac['exploracion'], height=300)
+                pac['exploracion'] = st.text_area("Exploración Física:", value=pac['exploracion'], height=300)
 
-        with t[4]: # DX Y PLAN CON PDF COMPLETO
+        with t[4]: # DX/PLAN
             with st.container(border=True):
-                pac['dx'] = st.text_area("Impresión Diagnóstica:", value=pac['dx'], height=150)
-                pac['plan'] = st.text_area("Plan de Manejo:", value=pac['plan'], height=150)
-                
-                if st.button("🖨️ GENERAR HISTORIA CLINICA COMPLETA", type="primary", use_container_width=True):
-                    pdf = PEDIATRIC_PDF()
-                    pdf.add_page()
-                    pdf.section_title("1. Datos de Filiación e Interrogatorio")
-                    pdf.add_field("Paciente", pac['nombre'])
-                    pdf.add_field("Edad / Sexo", f"{pac['edad']} / {pac['sexo']}")
-                    pdf.add_field("Ubicación", f"Origen: {pac['originario']} | Residente: {pac['residente']}")
-                    pdf.section_title("2. Signos Vitales y Somatometría")
-                    pdf.add_field("Vitales", f"FC: {pac['fc']} | FR: {pac['fr']} | Sat: {pac['sat']} | Temp: {pac['temp']} | TA: {pac['ta']}")
-                    pdf.section_title("3. Antecedentes")
-                    pdf.add_field("Hereditarios", pac['ahf'])
-                    pdf.add_field("Patológicos", pac['patologicos'])
-                    pdf.section_title("4. Diagnóstico y Plan")
-                    pdf.add_field("Impresión Diagnóstica", pac['dx'])
-                    pdf.add_field("Plan de Manejo", pac['plan'])
-                    st.download_button("Descargar Historia Clínica", pdf.output(dest='S').encode('latin-1'), f"HC_{pac['nombre']}.pdf")
+                pac['dx'], pac['plan'] = st.text_area("Impresión Diagnóstica:", value=pac['dx']), st.text_area("Plan:", value=pac['plan'])
+                if st.button("🖨️ GENERAR HISTORIA COMPLETA", type="primary", use_container_width=True):
+                    pdf = PEDIATRIC_PDF(); pdf.add_page(); pdf.section_title("Historia Clínica")
+                    pdf.add_field("Paciente", pac['nombre']); pdf.add_field("DX", pac['dx'])
+                    st.download_button("📥 Descargar PDF", pdf.output(dest='S').encode('latin-1'), f"HC_{pac['nombre']}.pdf", use_container_width=True)
 
         with t[5]: # EVOLUCIÓN
             with st.container(border=True):
-                st.subheader("Seguimiento del Paciente")
-                nueva = st.text_area("Escribir nota de evolución:")
-                if st.button("💾 Guardar Nota", use_container_width=True):
+                st.subheader("Notas de Evolución")
+                nueva = st.text_area("Escribir nota:")
+                if st.button("💾 Guardar Nota", use_container_width=True, type="primary"):
                     if nueva:
                         pac["notas_evolucion"].insert(0, {"f": datetime.now().strftime("%d/%m/%Y %H:%M"), "t": nueva})
                         st.rerun()
-                st.divider()
-                for n in pac["notas_evolucion"]:
-                    st.info(f"📅 {n['f']}\n{n['t']}")
-
+                for n in pac["notas_evolucion"]: st.info(f"📅 {n['f']}\n{n['t']}")
