@@ -227,13 +227,60 @@ if login_registro():
                     r_pdf.set_font('Arial', '', 11)
                     r_pdf.multi_cell(0, 8, pac['receta_texto'])
                     st.download_button("📥 Descargar Receta (PDF)", r_pdf.output(dest='S').encode('latin-1'), f"Receta_{pac['nombre']}.pdf", use_container_width=True)
-
-        with t[6]: # EVOLUCIÓN
+                    
+            with t[6]: # EVOLUCIÓN
             with st.container(border=True):
                 st.subheader("Notas de Evolución")
-                nueva = st.text_area("Nueva nota médica:")
+                nueva = st.text_area("Nueva nota médica:", placeholder="Escriba la evolución del paciente...")
+                
                 if st.button("💾 Guardar Nota", use_container_width=True, type="primary"):
                     if nueva:
-                        pac["notas_evolucion"].insert(0, {"f": datetime.now().strftime("%d/%m/%Y %H:%M"), "t": nueva})
+                        # Guardamos la nota con los signos actuales al momento de la nota
+                        registro = {
+                            "f": datetime.now().strftime("%d/%m/%Y %H:%M"), 
+                            "t": nueva,
+                            "sv": f"FC: {pac['fc']} | FR: {pac['fr']} | Sat: {pac['sat']} | Temp: {pac['temp']}"
+                        }
+                        pac["notas_evolucion"].insert(0, registro)
                         st.rerun()
-                for n in pac["notas_evolucion"]: st.info(f"📅 {n['f']}\n{n['t']}")
+                
+                st.divider()
+                
+                if pac["notas_evolucion"]:
+                    if st.button("📄 GENERAR REPORTE DE EVOLUCIÓN", use_container_width=True):
+                        pdf_ev = PEDIATRIC_PDF()
+                        pdf_ev.add_page()
+                        pdf_ev.section_title("Reporte de Evolución Clínica")
+                        pdf_ev.add_field("Paciente", pac['nombre'])
+                        pdf_ev.add_field("Edad/Sexo", f"{pac['edad']} / {pac['sexo']}")
+                        
+                        for n in pac["notas_evolucion"]:
+                            pdf_ev.ln(2)
+                            # Fecha y Signos Vitales en el PDF
+                            pdf_ev.set_font('Arial', 'B', 10)
+                            pdf_ev.set_text_color(0, 51, 102)
+                            pdf_ev.cell(0, 7, f"FECHA: {n['f']}", 0, 1)
+                            
+                            pdf_ev.set_font('Arial', 'I', 9)
+                            pdf_ev.set_text_color(100, 100, 100)
+                            # Intentamos obtener 'sv' por si hay notas viejas sin signos
+                            pdf_ev.cell(0, 5, f"SIGNOS: {n.get('sv', 'No registrados')}", 0, 1)
+                            
+                            pdf_ev.ln(1)
+                            pdf_ev.set_font('Arial', '', 10)
+                            pdf_ev.set_text_color(0, 0, 0)
+                            pdf_ev.multi_cell(0, 6, n['t'])
+                            pdf_ev.ln(2)
+                            pdf_ev.line(10, pdf_ev.get_y(), 200, pdf_ev.get_y())
+                        
+                        st.download_button(
+                            label="📥 Descargar Notas de Evolución (PDF)",
+                            data=pdf_ev.output(dest='S').encode('latin-1'),
+                            file_name=f"Evolucion_{pac['nombre']}.pdf",
+                            mime="application/pdf",
+                            use_container_width=True
+                        )
+                
+                for n in pac["notas_evolucion"]: 
+                    st.info(f"📅 {n['f']} | {n.get('sv', '')}\n\n{n['t']}")
+
