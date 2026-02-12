@@ -62,7 +62,7 @@ with st.sidebar:
         p_id = f"PAC-{datetime.now().strftime('%H%M%S')}"
         st.session_state["lista_pacientes"][p_id] = {
             "nombre": "", "f_nac": date(2020,1,1), "edad": "", "sexo": "M",
-            "fc": "", "fr": "", "sat": "", "temp": "",
+            "fc": "", "fr": "", "sat": "", "temp": "", "peso": "", "talla": "",
             "ahf": "", "prenatales": "", "natales": "", "vacunas": "", "alimentacion": "", "desarrollo": "",
             "motivo": "", "as_digestivo": "", "as_cardio": "", "as_urinario": "", "as_resp": "",
             "as_neuro": "", "as_piel": "", "as_musculo": "",
@@ -91,10 +91,13 @@ if "paciente_actual" in st.session_state:
             pac['edad'] = c2.text_input("Edad Actual:", value=pac['edad'])
             pac['sexo'] = c3.selectbox("Sexo:", ["M", "F"], index=0 if pac['sexo']=="M" else 1)
         with st.container(border=True):
-            st.subheader("📊 Signos Vitales")
+            st.subheader("📊 Signos Vitales y Antropometría")
             s1, s2, s3, s4 = st.columns(4)
             pac['fc'], pac['fr'] = s1.text_input("F.C. (lpm):", pac['fc']), s2.text_input("F.R. (rpm):", pac['fr'])
             pac['sat'], pac['temp'] = s3.text_input("SatO2 (%):", pac['sat']), s4.text_input("Temp (°C):", pac['temp'])
+            s5, s6 = st.columns(2)
+            pac['peso'] = s5.text_input("Peso (kg):", pac['peso'])
+            pac['talla'] = s6.text_input("Talla (cm):", pac['talla'])
 
     with t[1]: # ANTECEDENTES
         with st.container(border=True):
@@ -130,13 +133,12 @@ if "paciente_actual" in st.session_state:
             pdf = CLINIC_PDF()
             pdf.add_page()
             
-            # 1. FILIACIÓN Y SIGNOS
-            pdf.section_header("1. DATOS DE FILIACIÓN Y SIGNOS VITALES")
+            pdf.section_header("1. DATOS DE FILIACIÓN Y SOMATOMETRÍA")
             pdf.add_info("PACIENTE", pac['nombre'])
             pdf.add_info("IDENTIFICACIÓN", f"Nacimiento: {pac['f_nac']} | Edad: {pac['edad']} | Sexo: {pac['sexo']}")
+            pdf.add_info("SOMATOMETRÍA", f"Peso: {pac['peso']} kg | Talla: {pac['talla']} cm")
             pdf.add_info("SIGNOS VITALES", f"FC: {pac['fc']} | FR: {pac['fr']} | Sat: {pac['sat']} | T: {pac['temp']}°C")
             
-            # 2. ANTECEDENTES COMPLETOS
             pdf.section_header("2. ANTECEDENTES")
             pdf.add_info("HEREDOFAMILIARES", pac['ahf'])
             pdf.add_info("PRENATALES", pac['prenatales'])
@@ -145,9 +147,8 @@ if "paciente_actual" in st.session_state:
             pdf.add_info("ALIMENTACIÓN", pac['alimentacion'])
             pdf.add_info("DESARROLLO", pac['desarrollo'])
             
-            # 3. INTERROGATORIO POR SISTEMAS
             pdf.section_header("3. PADECIMIENTO ACTUAL Y SISTEMAS")
-            pdf.add_info("PADEZIMIENTO ACTUAL", pac['motivo'])
+            pdf.add_info("MOTIVO DE CONSULTA", pac['motivo'])
             pdf.add_info("DIGESTIVO", pac['as_digestivo'])
             pdf.add_info("RESPIRATORIO", pac['as_resp'])
             pdf.add_info("CARDIOVASCULAR", pac['as_cardio'])
@@ -155,16 +156,13 @@ if "paciente_actual" in st.session_state:
             pdf.add_info("NEUROLÓGICO", pac['as_neuro'])
             pdf.add_info("PIEL Y FANERAS", pac['as_piel'])
             
-            # 4. EXPLORACIÓN
             pdf.section_header("4. EXPLORACIÓN FÍSICA")
             pdf.add_info("HALLAZGOS", pac['exploracion'])
             
-            # 5. CONCLUSIÓN
             pdf.section_header("5. DIAGNÓSTICO Y PLAN")
             pdf.add_info("DX", pac['dx'])
             pdf.add_info("PLAN", pac['plan'])
             
-            # LÍNEA DE FIRMA
             pdf.ln(20)
             pdf.cell(0, 5, "__________________________________________", 0, 1, 'C')
             pdf.cell(0, 5, f"Firma: {st.session_state['datos_medico']}", 0, 1, 'C')
@@ -179,6 +177,7 @@ if "paciente_actual" in st.session_state:
             r_pdf.ln(10)
             r_pdf.section_header(f"RECETA MÉDICA - {date.today().strftime('%d/%m/%Y')}")
             r_pdf.add_info("PACIENTE", pac['nombre'])
+            r_pdf.add_info("PESO", f"{pac['peso']} kg")
             r_pdf.ln(5)
             r_pdf.set_font("Arial", "", 12)
             r_pdf.multi_cell(0, 10, pac['receta_texto'])
@@ -192,6 +191,7 @@ if "paciente_actual" in st.session_state:
                 e_pdf.add_page()
                 e_pdf.section_header(f"NOTA DE EVOLUCIÓN - {datetime.now().strftime('%d/%m/%Y %H:%M')}")
                 e_pdf.add_info("PACIENTE", pac['nombre'])
+                e_pdf.add_info("DATOS", f"Peso: {pac['peso']} kg | Talla: {pac['talla']} cm")
                 e_pdf.add_info("SIGNOS", f"FC: {pac['fc']} | FR: {pac['fr']} | T: {pac['temp']}°C")
                 e_pdf.ln(5)
                 e_pdf.set_font("Arial", "", 11)
