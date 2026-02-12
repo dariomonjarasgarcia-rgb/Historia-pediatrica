@@ -43,7 +43,7 @@ class CLINIC_PDF(FPDF):
         self.multi_cell(0, 7, text_val)
         self.ln(1)
 
-# --- SISTEMA DE USUARIOS CON PERSISTENCIA ---
+# --- SISTEMA DE USUARIOS ---
 def cargar_usuarios():
     if os.path.exists("usuarios.json"):
         with open("usuarios.json", "r") as f: return json.load(f)
@@ -55,13 +55,13 @@ def guardar_usuario(u, p):
     with open("usuarios.json", "w") as f: json.dump(db, f)
     st.session_state["db_usuarios"] = db
 
-# --- INICIALIZACIÓN DE ESTADO ---
+# --- INICIALIZACIÓN ---
 if "db_usuarios" not in st.session_state: st.session_state["db_usuarios"] = cargar_usuarios()
 if "lista_pacientes" not in st.session_state: st.session_state["lista_pacientes"] = {}
 if "datos_medico" not in st.session_state: st.session_state["datos_medico"] = "Dr. Dario Monjaras"
 if "sub_encabezado" not in st.session_state: st.session_state["sub_encabezado"] = "Pediatra Neonatólogo | Cédula: 1234567"
 
-# --- LÓGICA DE ACCESO / LOGIN ---
+# --- LOGIN ---
 if "autenticado" not in st.session_state:
     c1, c2, c3 = st.columns([1,2,1])
     with c2:
@@ -70,7 +70,6 @@ if "autenticado" not in st.session_state:
             modo = st.radio("Acción", ["Iniciar Sesión", "Registrarse"], horizontal=True)
             u = st.text_input("Usuario")
             p = st.text_input("Contraseña", type="password")
-            
             if modo == "Iniciar Sesión":
                 if st.button("Ingresar", use_container_width=True, type="primary"):
                     if u in st.session_state["db_usuarios"] and st.session_state["db_usuarios"][u] == p:
@@ -81,24 +80,40 @@ if "autenticado" not in st.session_state:
                 if st.button("Crear Cuenta", use_container_width=True):
                     if u and p:
                         guardar_usuario(u, p)
-                        st.success(f"Usuario {u} registrado con éxito. Ya puede iniciar sesión.")
-                    else: st.warning("Por favor llene ambos campos.")
+                        st.success("Usuario registrado. Ya puede iniciar sesión.")
     st.stop()
 
-# --- SIDEBAR (BARRA LATERAL) ---
+# --- SIDEBAR MEJORADA ---
 with st.sidebar:
     st.markdown(f"### 🩺 Dr. {st.session_state.get('datos_medico')}")
     if st.button("🚪 CERRAR SESIÓN", use_container_width=True):
         del st.session_state["autenticado"]
         st.rerun()
     st.divider()
-    st.markdown("### ⚙️ Configuración del PDF")
-    st.session_state["datos_medico"] = st.text_input("Nombre en PDF:", st.session_state["datos_medico"])
-    st.session_state["sub_encabezado"] = st.text_area("Cédula / Especialidad:", st.session_state["sub_encabezado"])
-    st.divider()
     
-    if st.button("➕ NUEVO PACIENTE", type="primary", use_container_width=True):
-        p_id = f"PAC-{datetime.now().strftime('%H%M%S')}"
+    st.button("➕ NUEVO PACIENTE", type="primary", use_container_width=True, on_click=lambda: st.session_state.update({"paciente_actual": f"PAC-{datetime.now().strftime('%H%M%S')}"}))
+    
+    # NUEVA LISTA DE PACIENTES VISUAL
+    st.markdown("### 📋 Lista de Expedientes")
+    if not st.session_state["lista_pacientes"]:
+        st.info("No hay pacientes registrados.")
+    else:
+        for p_id, datos in st.session_state["lista_pacientes"].items():
+            nombre_label = datos['nombre'] if datos['nombre'] else "Paciente sin nombre"
+            # Botón estilizado para cada paciente
+            if st.button(f"👤 {nombre_label}", key=p_id, use_container_width=True, help=f"ID: {p_id}"):
+                st.session_state["paciente_actual"] = p_id
+                st.rerun()
+
+    st.divider()
+    with st.expander("⚙️ Configuración PDF"):
+        st.session_state["datos_medico"] = st.text_input("Nombre en PDF:", st.session_state["datos_medico"])
+        st.session_state["sub_encabezado"] = st.text_area("Cédula / Especialidad:", st.session_state["sub_encabezado"])
+
+# --- PANEL PRINCIPAL ---
+if "paciente_actual" in st.session_state:
+    p_id = st.session_state["paciente_actual"]
+    if p_id not in st.session_state["lista_pacientes"]:
         st.session_state["lista_pacientes"][p_id] = {
             "nombre": "", "f_nac": date(2020,1,1), "edad": "", "sexo": "M",
             "fc": "", "fr": "", "sat": "", "temp": "", "peso": "", "talla": "",
@@ -107,16 +122,8 @@ with st.sidebar:
             "as_neuro": "", "as_piel": "", "as_musculo": "",
             "exploracion": "", "dx": "", "plan": "", "receta_texto": ""
         }
-        st.session_state["paciente_actual"] = p_id
-        st.rerun()
     
-    opciones = list(st.session_state["lista_pacientes"].keys())
-    if opciones:
-        st.session_state["paciente_actual"] = st.selectbox("📂 Buscar Expediente:", opciones)
-
-# --- PANEL PRINCIPAL ---
-if "paciente_actual" in st.session_state:
-    pac = st.session_state["lista_pacientes"][st.session_state["paciente_actual"]]
+    pac = st.session_state["lista_pacientes"][p_id]
     st.markdown(f"<h1 style='text-align: center; color: #003366;'>🧑‍⚕️ {pac['nombre'] if pac['nombre'] else 'Paciente Nuevo'}</h1>", unsafe_allow_html=True)
     
     t = st.tabs(["📋 Filiación", "🧬 Antecedentes", "🫁 Sistemas", "🔍 Exploración", "📝 DX/Plan", "💊 Receta", "📈 Evolución"])
@@ -140,12 +147,9 @@ if "paciente_actual" in st.session_state:
     with t[1]: # ANTECEDENTES
         with st.container(border=True):
             col1, col2 = st.columns(2)
-            pac['ahf'] = col1.text_area("Heredofamiliares:", value=pac['ahf'])
-            pac['prenatales'] = col2.text_area("Prenatales:", value=pac['prenatales'])
-            pac['natales'] = col1.text_area("Natales:", value=pac['natales'])
-            pac['vacunas'] = col2.text_area("Vacunas:", value=pac['vacunas'])
-            pac['alimentacion'] = col1.text_area("Alimentación:", value=pac['alimentacion'])
-            pac['desarrollo'] = col2.text_area("Hitos Desarrollo:", value=pac['desarrollo'])
+            pac['ahf'], pac['prenatales'] = col1.text_area("Heredofamiliares:", value=pac['ahf']), col2.text_area("Prenatales:", value=pac['prenatales'])
+            pac['natales'], pac['vacunas'] = col1.text_area("Natales:", value=pac['natales']), col2.text_area("Vacunas:", value=pac['vacunas'])
+            pac['alimentacion'], pac['desarrollo'] = col1.text_area("Alimentación:", value=pac['alimentacion']), col2.text_area("Hitos Desarrollo:", value=pac['desarrollo'])
 
     with t[2]: # SISTEMAS
         with st.container(border=True):
@@ -161,24 +165,21 @@ if "paciente_actual" in st.session_state:
 
     with t[4]: # DX / PLAN / GENERAR PDF
         with st.container(border=True):
-            pac['dx'] = st.text_area("Impresión Diagnóstica:", value=pac['dx'])
-            pac['plan'] = st.text_area("Plan Terapéutico:", value=pac['plan'])
+            pac['dx'], pac['plan'] = st.text_area("Impresión Diagnóstica:", value=pac['dx']), st.text_area("Plan Terapéutico:", value=pac['plan'])
         
         if st.button("🖨️ GENERAR EXPEDIENTE COMPLETO", type="primary", use_container_width=True):
             pdf = CLINIC_PDF()
             pdf.add_page()
             pdf.section_header("1. DATOS DE FILIACIÓN Y SOMATOMETRÍA")
             pdf.add_info("PACIENTE", pac['nombre'])
-            pdf.add_info("IDENTIFICACIÓN", f"Nacimiento: {pac['f_nac']} | Edad: {pac['edad']} | Sexo: {pac['sexo']}")
             pdf.add_info("SOMATOMETRÍA", f"Peso: {pac['peso']} kg | Talla: {pac['talla']} cm")
-            pdf.add_info("SIGNOS VITALES", f"FC: {pac['fc']} | FR: {pac['fr']} | Sat: {pac['sat']} | T: {pac['temp']}°C")
+            pdf.add_info("SIGNOS", f"FC: {pac['fc']} | FR: {pac['fr']} | Sat: {pac['sat']} | T: {pac['temp']}°C")
             pdf.section_header("2. ANTECEDENTES")
-            pdf.add_info("HEREDOFAMILIARES", pac['ahf']); pdf.add_info("PRENATALES", pac['prenatales']); pdf.add_info("NATALES", pac['natales'])
+            pdf.add_info("AHF", pac['ahf']); pdf.add_info("PRENATALES", pac['prenatales']); pdf.add_info("NATALES", pac['natales'])
             pdf.add_info("VACUNAS", pac['vacunas']); pdf.add_info("ALIMENTACIÓN", pac['alimentacion']); pdf.add_info("DESARROLLO", pac['desarrollo'])
-            pdf.section_header("3. PADECIMIENTO ACTUAL Y SISTEMAS")
+            pdf.section_header("3. PADECIMIENTO Y SISTEMAS")
             pdf.add_info("MOTIVO", pac['motivo']); pdf.add_info("DIGESTIVO", pac['as_digestivo']); pdf.add_info("RESPIRATORIO", pac['as_resp'])
-            pdf.add_info("CARDIOVASCULAR", pac['as_cardio']); pdf.add_info("GENITOURINARIO", pac['as_urinario'])
-            pdf.add_info("NEUROLÓGICO", pac['as_neuro']); pdf.add_info("PIEL", pac['as_piel'])
+            pdf.add_info("CARDIO", pac['as_cardio']); pdf.add_info("URINARIO", pac['as_urinario']); pdf.add_info("NEURO", pac['as_neuro']); pdf.add_info("PIEL", pac['as_piel'])
             pdf.section_header("4. EXPLORACIÓN FÍSICA")
             pdf.add_info("HALLAZGOS", pac['exploracion'])
             pdf.section_header("5. DIAGNÓSTICO Y PLAN")
@@ -201,16 +202,13 @@ if "paciente_actual" in st.session_state:
             st.download_button("📥 Descargar Receta", r_pdf.output(dest='S').encode('latin-1'), f"Receta_{pac['nombre']}.pdf")
 
     with t[6]: # EVOLUCIÓN
-        nota_hoy = st.text_area("Nota de hoy:", height=250, placeholder="Escriba la nota de evolución aquí...")
+        nota_hoy = st.text_area("Nota de hoy:", height=250)
         if st.button("💾 DESCARGAR NOTA"):
             if nota_hoy:
                 e_pdf = CLINIC_PDF()
                 e_pdf.add_page()
                 e_pdf.section_header(f"NOTA DE EVOLUCIÓN - {datetime.now().strftime('%d/%m/%Y %H:%M')}")
                 e_pdf.add_info("PACIENTE", pac['nombre'])
-                e_pdf.add_info("DATOS", f"Peso: {pac['peso']} kg | Talla: {pac['talla']} cm")
                 e_pdf.add_info("SIGNOS", f"FC: {pac['fc']} | FR: {pac['fr']} | T: {pac['temp']}°C")
                 e_pdf.ln(5); e_pdf.set_font("Arial", "", 11); e_pdf.multi_cell(0, 9, nota_hoy)
                 st.download_button("📥 Descargar Nota", e_pdf.output(dest='S').encode('latin-1'), f"Nota_{pac['nombre']}.pdf")
-            else:
-                st.error("Debe escribir una nota antes de descargar.")
