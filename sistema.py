@@ -228,7 +228,7 @@ if login_registro():
                     r_pdf.multi_cell(0, 8, pac['receta_texto'])
                     st.download_button("📥 Descargar Receta (PDF)", r_pdf.output(dest='S').encode('latin-1'), f"Receta_{pac['nombre']}.pdf", use_container_width=True)
                     
-            with t[6]: # EVOLUCIÓN
+         with t[6]: # EVOLUCIÓN
             with st.container(border=True):
                 st.subheader("Notas de Evolución")
                 nueva = st.text_area("Nueva nota médica:", placeholder="Escriba la evolución del paciente...")
@@ -283,4 +283,5 @@ if login_registro():
                 
                 for n in pac["notas_evolucion"]: 
                     st.info(f"📅 {n['f']} | {n.get('sv', '')}\n\n{n['t']}")
+
 
