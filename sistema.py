@@ -1,4 +1,4 @@
-import streamlit as st
+eimport streamlit as st
 from fpdf import FPDF
 from datetime import date, datetime
 import io
@@ -227,15 +227,13 @@ if login_registro():
                     r_pdf.set_font('Arial', '', 11)
                     r_pdf.multi_cell(0, 8, pac['receta_texto'])
                     st.download_button("📥 Descargar Receta (PDF)", r_pdf.output(dest='S').encode('latin-1'), f"Receta_{pac['nombre']}.pdf", use_container_width=True)
-                    
-          with t[6]: # EVOLUCIÓN
+                    with t[6]: # EVOLUCIÓN (Línea 231)
             with st.container(border=True):
                 st.subheader("Notas de Evolución")
                 nueva = st.text_area("Nueva nota médica:", placeholder="Escriba la evolución del paciente...")
                 
                 if st.button("💾 Guardar Nota", use_container_width=True, type="primary"):
                     if nueva:
-                        # Guardamos la nota con los signos actuales al momento de la nota
                         registro = {
                             "f": datetime.now().strftime("%d/%m/%Y %H:%M"), 
                             "t": nueva,
@@ -256,22 +254,24 @@ if login_registro():
                         
                         for n in pac["notas_evolucion"]:
                             pdf_ev.ln(2)
-                            # Fecha y Signos Vitales en el PDF
                             pdf_ev.set_font('Arial', 'B', 10)
                             pdf_ev.set_text_color(0, 51, 102)
                             pdf_ev.cell(0, 7, f"FECHA: {n['f']}", 0, 1)
-                            
                             pdf_ev.set_font('Arial', 'I', 9)
                             pdf_ev.set_text_color(100, 100, 100)
-                            # Intentamos obtener 'sv' por si hay notas viejas sin signos
                             pdf_ev.cell(0, 5, f"SIGNOS: {n.get('sv', 'No registrados')}", 0, 1)
-                            
                             pdf_ev.ln(1)
                             pdf_ev.set_font('Arial', '', 10)
                             pdf_ev.set_text_color(0, 0, 0)
                             pdf_ev.multi_cell(0, 6, n['t'])
                             pdf_ev.ln(2)
                             pdf_ev.line(10, pdf_ev.get_y(), 200, pdf_ev.get_y())
+
+                        # Pie de página con firma
+                        pdf_ev.ln(10)
+                        pdf_ev.set_font('Arial', 'I', 8)
+                        pdf_ev.cell(0, 5, "__________________________________________", 0, 1, 'C')
+                        pdf_ev.cell(0, 5, f"Firma del Médico: {st.session_state['user_actual']}", 0, 1, 'C')
                         
                         st.download_button(
                             label="📥 Descargar Notas de Evolución (PDF)",
@@ -283,6 +283,9 @@ if login_registro():
                 
                 for n in pac["notas_evolucion"]: 
                     st.info(f"📅 {n['f']} | {n.get('sv', '')}\n\n{n['t']}")
+
+
+
 
 
 
