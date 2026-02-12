@@ -43,7 +43,7 @@ class CLINIC_PDF(FPDF):
         self.multi_cell(0, 7, text_val)
         self.ln(1)
 
-# --- SISTEMA DE USUARIOS Y AUTORIZACIÓN (AJUSTADO) ---
+# --- SISTEMA DE USUARIOS Y AUTORIZACIÓN ---
 def cargar_usuarios():
     if os.path.exists("usuarios.json"):
         with open("usuarios.json", "r") as f: return json.load(f)
@@ -67,55 +67,58 @@ if "lista_pacientes" not in st.session_state: st.session_state["lista_pacientes"
 if "datos_medico" not in st.session_state: st.session_state["datos_medico"] = "Dr. Dario Monjaras"
 if "sub_encabezado" not in st.session_state: st.session_state["sub_encabezado"] = "Pediatra Neonatólogo | Cédula: 1234567"
 
-# --- LOGIN (CON FILTRO DE AUTORIZACIÓN) ---
+# --- LOGIN ---
 if "autenticado" not in st.session_state:
     c1, c2, c3 = st.columns([1,2,1])
     with c2:
         with st.container(border=True):
             st.title("📂 Expediente Clínico")
             modo = st.radio("Acción", ["Iniciar Sesión", "Registrarse"], horizontal=True)
-            u = st.text_input("Usuario")
-            p = st.text_input("Contraseña", type="password")
+            u_input = st.text_input("Usuario")
+            p_input = st.text_input("Contraseña", type="password")
             
             if modo == "Iniciar Sesión":
                 if st.button("Ingresar", use_container_width=True, type="primary"):
+                    # Lectura fresca de archivos para evitar errores de caché
                     db_actual = cargar_usuarios()
                     auth_list = cargar_autorizados()
-                    if u in db_actual and db_actual[u] == p:
-                        if u in auth_list:
+                    
+                    if u_input in db_actual and db_actual[u_input] == p_input:
+                        if u_input in auth_list:
                             st.session_state["autenticado"] = True
-                            st.session_state["usuario_actual"] = u
+                            st.session_state["usuario_actual"] = u_input
                             st.rerun()
                         else:
-                            st.error("⚠️ Usuario registrado pero pendiente de autorización.")
-                    else: st.error("Credenciales incorrectas")
+                            st.error("⚠️ Cuenta pendiente de autorización por el Administrador.")
+                    else:
+                        st.error("Credenciales incorrectas")
             else:
                 if st.button("Crear Cuenta", use_container_width=True):
-                    if u and p:
-                        guardar_usuario(u, p)
-                        st.success("Usuario registrado. El administrador debe autorizarte.")
+                    if u_input and p_input:
+                        guardar_usuario(u_input, p_input)
+                        st.success("Usuario registrado. Solicite autorización al administrador.")
     st.stop()
 
 # --- SIDEBAR MEJORADA ---
 with st.sidebar:
-    st.markdown(f"### 🩺 Dr. {st.session_state.get('usuario_actual')}")
+    st.markdown(f"### 🩺 Sesión: {st.session_state.get('usuario_actual')}")
     if st.button("🚪 CERRAR SESIÓN", use_container_width=True):
         st.session_state.clear()
         st.rerun()
     st.divider()
 
-    # --- PANEL SECRETO DE ADMINISTRADOR ---
+    # --- PANEL DE ACTIVACIÓN (Solo para Admin) ---
     if st.session_state.get("usuario_actual") == "admin":
-        with st.expander("👑 PANEL DE ACTIVACIÓN", expanded=True):
+        with st.expander("👑 ACTIVAR USUARIOS", expanded=True):
             db_admin = cargar_usuarios()
             auth_list = cargar_autorizados()
             for user in list(db_admin.keys()):
                 if user != "admin":
                     col_u, col_b = st.columns([2,1])
-                    status = "✅" if user in auth_list else "⏳"
-                    col_u.write(f"{status} {user}")
+                    activo = user in auth_list
+                    col_u.write(f"{'✅' if activo else '⏳'} {user}")
                     if col_b.button("OK", key=f"btn_{user}"):
-                        if user in auth_list: auth_list.remove(user)
+                        if activo: auth_list.remove(user)
                         else: auth_list.append(user)
                         guardar_autorizados(auth_list)
                         st.rerun()
