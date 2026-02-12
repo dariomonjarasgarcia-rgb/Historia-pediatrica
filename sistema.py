@@ -65,7 +65,7 @@ def login_registro():
         col1, col2, col3 = st.columns([1,2,1])
         with col2:
             with st.container(border=True):
-                st.title("🏥 Acceso Clínico")
+                st.title("📂 Expediente Médico")
                 choice = st.radio("Acceso", ["Iniciar Sesión", "Registrarse"], horizontal=True)
                 if choice == "Iniciar Sesión":
                     u = st.text_input("Usuario")
@@ -239,3 +239,4 @@ if login_registro():
                 st.divider()
                 for n in pac["notas_evolucion"]:
                     st.info(f"📅 {n['f']}\n{n['t']}")
+
