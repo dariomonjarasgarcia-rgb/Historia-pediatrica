@@ -13,15 +13,12 @@ cargar_estilo_hospital()
 # --- MOTOR PDF CON ESTILO ---
 class CLINIC_PDF(FPDF):
     def header(self):
-        # Dibujar rectángulo de encabezado
         self.set_fill_color(240, 245, 250)
         self.rect(0, 0, 210, 40, 'F')
-        
         self.set_font('Arial', 'B', 16)
         self.set_text_color(0, 51, 102)
         nombre_medico = st.session_state.get("datos_medico", "Dr. Dario Monjaras")
         self.cell(0, 10, nombre_medico.upper(), 0, 1, 'C')
-        
         self.set_font('Arial', '', 9)
         self.set_text_color(100, 100, 100)
         sub = st.session_state.get("sub_encabezado", "Cédula Profesional | Especialidad")
@@ -29,6 +26,7 @@ class CLINIC_PDF(FPDF):
         self.ln(15)
 
     def section_header(self, title):
+        self.ln(2)
         self.set_font('Arial', 'B', 12)
         self.set_fill_color(0, 51, 102)
         self.set_text_color(255, 255, 255)
@@ -41,7 +39,8 @@ class CLINIC_PDF(FPDF):
         self.write(7, f"{label}: ")
         self.set_font('Arial', '', 10)
         self.set_text_color(0, 0, 0)
-        self.multi_cell(0, 7, str(value) if value else "No registrado")
+        text_val = str(value) if value and str(value).strip() != "" else "No referido / Negado"
+        self.multi_cell(0, 7, text_val)
         self.ln(1)
 
 # --- INICIALIZACIÓN ---
@@ -52,7 +51,7 @@ if "datos_medico" not in st.session_state:
 if "sub_encabezado" not in st.session_state:
     st.session_state["sub_encabezado"] = "Pediatra Neonatólogo | Cédula: 1234567"
 
-# --- SIDEBAR (CONFIGURACIÓN Y PACIENTES) ---
+# --- SIDEBAR ---
 with st.sidebar:
     st.markdown("### ⚙️ Configuración Profesional")
     st.session_state["datos_medico"] = st.text_input("Nombre del Médico:", st.session_state["datos_medico"])
@@ -131,22 +130,43 @@ if "paciente_actual" in st.session_state:
         if st.button("🖨️ GENERAR EXPEDIENTE COMPLETO", type="primary", use_container_width=True):
             pdf = CLINIC_PDF()
             pdf.add_page()
-            pdf.section_header("HISTORIA CLÍNICA PEDIÁTRICA")
+            
+            # SECCIÓN 1: FILIACIÓN
+            pdf.section_header("1. DATOS DE FILIACIÓN Y SIGNOS")
             pdf.add_info("PACIENTE", pac['nombre'])
-            pdf.add_info("DATOS", f"Nacimiento: {pac['f_nac']} | Edad: {pac['edad']} | Sexo: {pac['sexo']}")
-            pdf.add_info("SIGNOS VITALES", f"FC: {pac['fc']} | FR: {pac['fr']} | Sat: {pac['sat']} | T: {pac['temp']}")
-            pdf.section_header("ANTECEDENTES Y SISTEMAS")
+            pdf.add_info("DATOS", f"Fecha Nacimiento: {pac['f_nac']} | Edad: {pac['edad']} | Sexo: {pac['sexo']}")
+            pdf.add_info("SIGNOS VITALES", f"FC: {pac['fc']} | FR: {pac['fr']} | SatO2: {pac['sat']} | Temp: {pac['temp']}°C")
+            
+            # SECCIÓN 2: ANTECEDENTES (Todos los campos)
+            pdf.section_header("2. ANTECEDENTES")
             pdf.add_info("HEREDOFAMILIARES", pac['ahf'])
+            pdf.add_info("PRENATALES", pac['prenatales'])
+            pdf.add_info("NATALES", pac['natales'])
+            pdf.add_info("VACUNAS", pac['vacunas'])
+            pdf.add_info("ALIMENTACIÓN", pac['alimentacion'])
+            pdf.add_info("DESARROLLO", pac['desarrollo'])
+            
+            # SECCIÓN 3: PADECIMIENTO Y SISTEMAS
+            pdf.section_header("3. PADECIMIENTO ACTUAL Y SISTEMAS")
             pdf.add_info("MOTIVO DE CONSULTA", pac['motivo'])
-            pdf.add_info("EXPLORACIÓN FÍSICA", pac['exploracion'])
-            pdf.section_header("DIAGNÓSTICO Y TRATAMIENTO")
-            pdf.add_info("DX", pac['dx'])
-            pdf.add_info("PLAN", pac['plan'])
-            st.download_button("📥 Descargar Expediente", pdf.output(dest='S').encode('latin-1'), f"HC_{pac['nombre']}.pdf")
+            pdf.add_info("AP. DIGESTIVO", pac['as_digestivo'])
+            pdf.add_info("AP. RESPIRATORIO", pac['as_resp'])
+            pdf.add_info("AP. CARDIOVASCULAR", pac['as_cardio'])
+            pdf.add_info("AP. GENITOURINARIO", pac['as_urinario'])
+            
+            # SECCIÓN 4: EXPLORACIÓN FÍSICA
+            pdf.section_header("4. EXPLORACIÓN FÍSICA")
+            pdf.add_info("DETALLE", pac['exploracion'])
+            
+            # SECCIÓN 5: DX Y PLAN
+            pdf.section_header("5. IMPRESIÓN DIAGNÓSTICA Y PLAN")
+            pdf.add_info("DIAGNÓSTICO", pac['dx'])
+            pdf.add_info("PLAN DE MANEJO", pac['plan'])
+            
+            st.download_button("📥 Descargar Expediente Completo", pdf.output(dest='S').encode('latin-1'), f"HC_{pac['nombre']}.pdf")
 
     with t[5]:
         with st.container(border=True):
-            st.info("💡 El encabezado se configura en la barra lateral.")
             pac['receta_texto'] = st.text_area("Indicaciones Médicas:", value=pac['receta_texto'], height=300)
             if st.button("📄 IMPRIMIR RECETA", type="primary", use_container_width=True):
                 r_pdf = CLINIC_PDF()
