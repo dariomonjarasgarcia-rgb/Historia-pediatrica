@@ -10,7 +10,7 @@ from interface_premium import cargar_estilo_hospital
 st.set_page_config(page_title="Unidad Pediátrica", layout="wide", page_icon="🏥")
 cargar_estilo_hospital()
 
-# --- MOTOR PDF CON ESTILO ---
+# --- MOTOR PDF PROFESIONAL ---
 class CLINIC_PDF(FPDF):
     def header(self):
         self.set_fill_color(240, 245, 250)
@@ -65,6 +65,7 @@ with st.sidebar:
             "fc": "", "fr": "", "sat": "", "temp": "",
             "ahf": "", "prenatales": "", "natales": "", "vacunas": "", "alimentacion": "", "desarrollo": "",
             "motivo": "", "as_digestivo": "", "as_cardio": "", "as_urinario": "", "as_resp": "",
+            "as_neuro": "", "as_piel": "", "as_musculo": "",
             "exploracion": "", "dx": "", "plan": "", "receta_texto": ""
         }
         st.session_state["paciente_actual"] = p_id
@@ -77,12 +78,11 @@ with st.sidebar:
 # --- PANEL PRINCIPAL ---
 if "paciente_actual" in st.session_state:
     pac = st.session_state["lista_pacientes"][st.session_state["paciente_actual"]]
-    
     st.markdown(f"<h1 style='text-align: center; color: #003366;'>🧑‍⚕️ {pac['nombre'] if pac['nombre'] else 'Paciente Nuevo'}</h1>", unsafe_allow_html=True)
     
     t = st.tabs(["📋 Filiación", "🧬 Antecedentes", "🫁 Sistemas", "🔍 Exploración", "📝 DX/Plan", "💊 Receta", "📈 Evolución"])
 
-    with t[0]:
+    with t[0]: # FILIACIÓN
         with st.container(border=True):
             st.subheader("Datos de Identificación")
             pac['nombre'] = st.text_input("Nombre Completo:", value=pac['nombre'])
@@ -90,54 +90,53 @@ if "paciente_actual" in st.session_state:
             pac['f_nac'] = c1.date_input("Fecha de Nacimiento:", pac['f_nac'])
             pac['edad'] = c2.text_input("Edad Actual:", value=pac['edad'])
             pac['sexo'] = c3.selectbox("Sexo:", ["M", "F"], index=0 if pac['sexo']=="M" else 1)
-        
         with st.container(border=True):
             st.subheader("📊 Signos Vitales")
             s1, s2, s3, s4 = st.columns(4)
-            pac['fc'] = s1.text_input("F.C. (lpm):", pac['fc'])
-            pac['fr'] = s2.text_input("F.R. (rpm):", pac['fr'])
-            pac['sat'] = s3.text_input("SatO2 (%):", pac['sat'])
-            pac['temp'] = s4.text_input("Temp (°C):", pac['temp'])
+            pac['fc'], pac['fr'] = s1.text_input("F.C. (lpm):", pac['fc']), s2.text_input("F.R. (rpm):", pac['fr'])
+            pac['sat'], pac['temp'] = s3.text_input("SatO2 (%):", pac['sat']), s4.text_input("Temp (°C):", pac['temp'])
 
-    with t[1]:
+    with t[1]: # ANTECEDENTES
         with st.container(border=True):
             col1, col2 = st.columns(2)
-            pac['ahf'] = col1.text_area("Heredofamiliares:", value=pac['ahf'], height=150)
-            pac['prenatales'] = col2.text_area("Prenatales:", value=pac['prenatales'], height=150)
-            pac['natales'] = col1.text_area("Natales:", value=pac['natales'], height=150)
-            pac['vacunas'] = col2.text_area("Vacunas:", value=pac['vacunas'], height=150)
+            pac['ahf'] = col1.text_area("Heredofamiliares:", value=pac['ahf'])
+            pac['prenatales'] = col2.text_area("Prenatales:", value=pac['prenatales'])
+            pac['natales'] = col1.text_area("Natales:", value=pac['natales'])
+            pac['vacunas'] = col2.text_area("Vacunas:", value=pac['vacunas'])
             pac['alimentacion'] = col1.text_area("Alimentación:", value=pac['alimentacion'])
             pac['desarrollo'] = col2.text_area("Hitos Desarrollo:", value=pac['desarrollo'])
 
-    with t[2]:
+    with t[2]: # SISTEMAS
         with st.container(border=True):
-            pac['motivo'] = st.text_area("Padecimiento Actual:", value=pac['motivo'], height=150)
+            pac['motivo'] = st.text_area("Padecimiento Actual:", value=pac['motivo'], height=120)
             st.divider()
             ca, cb = st.columns(2)
-            pac['as_digestivo'] = ca.text_area("Digestivo:", value=pac['as_digestivo'])
-            pac['as_resp'] = cb.text_area("Respiratorio:", value=pac['as_resp'])
-            pac['as_cardio'] = ca.text_area("Cardiovascular:", value=pac['as_cardio'])
-            pac['as_urinario'] = cb.text_area("Genitourinario:", value=pac['as_urinario'])
+            pac['as_digestivo'] = ca.text_area("A. Digestivo:", value=pac['as_digestivo'])
+            pac['as_resp'] = cb.text_area("A. Respiratorio:", value=pac['as_resp'])
+            pac['as_cardio'] = ca.text_area("A. Cardiovascular:", value=pac['as_cardio'])
+            pac['as_urinario'] = cb.text_area("A. Genitourinario:", value=pac['as_urinario'])
+            pac['as_neuro'] = ca.text_area("A. Neurológico:", value=pac['as_neuro'])
+            pac['as_piel'] = cb.text_area("Piel y Faneras:", value=pac['as_piel'])
 
-    with t[3]:
+    with t[3]: # EXPLORACIÓN
         pac['exploracion'] = st.text_area("Hallazgos de Exploración Física:", value=pac['exploracion'], height=350)
 
-    with t[4]:
+    with t[4]: # DX / PLAN / GENERAR PDF
         with st.container(border=True):
-            pac['dx'] = st.text_area("Impresión Diagnóstica:", value=pac['dx'], height=100)
-            pac['plan'] = st.text_area("Plan Terapéutico:", value=pac['plan'], height=150)
+            pac['dx'] = st.text_area("Impresión Diagnóstica:", value=pac['dx'])
+            pac['plan'] = st.text_area("Plan Terapéutico:", value=pac['plan'])
         
         if st.button("🖨️ GENERAR EXPEDIENTE COMPLETO", type="primary", use_container_width=True):
             pdf = CLINIC_PDF()
             pdf.add_page()
             
-            # SECCIÓN 1: FILIACIÓN
-            pdf.section_header("1. DATOS DE FILIACIÓN Y SIGNOS")
+            # 1. FILIACIÓN Y SIGNOS
+            pdf.section_header("1. DATOS DE FILIACIÓN Y SIGNOS VITALES")
             pdf.add_info("PACIENTE", pac['nombre'])
-            pdf.add_info("DATOS", f"Fecha Nacimiento: {pac['f_nac']} | Edad: {pac['edad']} | Sexo: {pac['sexo']}")
-            pdf.add_info("SIGNOS VITALES", f"FC: {pac['fc']} | FR: {pac['fr']} | SatO2: {pac['sat']} | Temp: {pac['temp']}°C")
+            pdf.add_info("IDENTIFICACIÓN", f"Nacimiento: {pac['f_nac']} | Edad: {pac['edad']} | Sexo: {pac['sexo']}")
+            pdf.add_info("SIGNOS VITALES", f"FC: {pac['fc']} | FR: {pac['fr']} | Sat: {pac['sat']} | T: {pac['temp']}°C")
             
-            # SECCIÓN 2: ANTECEDENTES (Todos los campos)
+            # 2. ANTECEDENTES COMPLETOS
             pdf.section_header("2. ANTECEDENTES")
             pdf.add_info("HEREDOFAMILIARES", pac['ahf'])
             pdf.add_info("PRENATALES", pac['prenatales'])
@@ -146,43 +145,48 @@ if "paciente_actual" in st.session_state:
             pdf.add_info("ALIMENTACIÓN", pac['alimentacion'])
             pdf.add_info("DESARROLLO", pac['desarrollo'])
             
-            # SECCIÓN 3: PADECIMIENTO Y SISTEMAS
+            # 3. INTERROGATORIO POR SISTEMAS
             pdf.section_header("3. PADECIMIENTO ACTUAL Y SISTEMAS")
-            pdf.add_info("MOTIVO DE CONSULTA", pac['motivo'])
-            pdf.add_info("AP. DIGESTIVO", pac['as_digestivo'])
-            pdf.add_info("AP. RESPIRATORIO", pac['as_resp'])
-            pdf.add_info("AP. CARDIOVASCULAR", pac['as_cardio'])
-            pdf.add_info("AP. GENITOURINARIO", pac['as_urinario'])
+            pdf.add_info("PADEZIMIENTO ACTUAL", pac['motivo'])
+            pdf.add_info("DIGESTIVO", pac['as_digestivo'])
+            pdf.add_info("RESPIRATORIO", pac['as_resp'])
+            pdf.add_info("CARDIOVASCULAR", pac['as_cardio'])
+            pdf.add_info("GENITOURINARIO", pac['as_urinario'])
+            pdf.add_info("NEUROLÓGICO", pac['as_neuro'])
+            pdf.add_info("PIEL Y FANERAS", pac['as_piel'])
             
-            # SECCIÓN 4: EXPLORACIÓN FÍSICA
+            # 4. EXPLORACIÓN
             pdf.section_header("4. EXPLORACIÓN FÍSICA")
-            pdf.add_info("DETALLE", pac['exploracion'])
+            pdf.add_info("HALLAZGOS", pac['exploracion'])
             
-            # SECCIÓN 5: DX Y PLAN
-            pdf.section_header("5. IMPRESIÓN DIAGNÓSTICA Y PLAN")
-            pdf.add_info("DIAGNÓSTICO", pac['dx'])
-            pdf.add_info("PLAN DE MANEJO", pac['plan'])
+            # 5. CONCLUSIÓN
+            pdf.section_header("5. DIAGNÓSTICO Y PLAN")
+            pdf.add_info("DX", pac['dx'])
+            pdf.add_info("PLAN", pac['plan'])
             
-            st.download_button("📥 Descargar Expediente Completo", pdf.output(dest='S').encode('latin-1'), f"HC_{pac['nombre']}.pdf")
+            # LÍNEA DE FIRMA
+            pdf.ln(20)
+            pdf.cell(0, 5, "__________________________________________", 0, 1, 'C')
+            pdf.cell(0, 5, f"Firma: {st.session_state['datos_medico']}", 0, 1, 'C')
+            
+            st.download_button("📥 Descargar Historia Clínica", pdf.output(dest='S').encode('latin-1'), f"HC_{pac['nombre']}.pdf")
 
-    with t[5]:
-        with st.container(border=True):
-            pac['receta_texto'] = st.text_area("Indicaciones Médicas:", value=pac['receta_texto'], height=300)
-            if st.button("📄 IMPRIMIR RECETA", type="primary", use_container_width=True):
-                r_pdf = CLINIC_PDF()
-                r_pdf.add_page()
-                r_pdf.ln(10)
-                r_pdf.section_header(f"RECETA MÉDICA - {date.today().strftime('%d/%m/%Y')}")
-                r_pdf.add_info("PACIENTE", pac['nombre'])
-                r_pdf.ln(5)
-                r_pdf.set_font("Arial", "", 12)
-                r_pdf.multi_cell(0, 10, pac['receta_texto'])
-                st.download_button("📥 Descargar Receta", r_pdf.output(dest='S').encode('latin-1'), f"Receta_{pac['nombre']}.pdf")
+    with t[5]: # RECETA
+        pac['receta_texto'] = st.text_area("Instrucciones:", value=pac['receta_texto'], height=300)
+        if st.button("📄 GENERAR RECETA PDF", type="primary", use_container_width=True):
+            r_pdf = CLINIC_PDF()
+            r_pdf.add_page()
+            r_pdf.ln(10)
+            r_pdf.section_header(f"RECETA MÉDICA - {date.today().strftime('%d/%m/%Y')}")
+            r_pdf.add_info("PACIENTE", pac['nombre'])
+            r_pdf.ln(5)
+            r_pdf.set_font("Arial", "", 12)
+            r_pdf.multi_cell(0, 10, pac['receta_texto'])
+            st.download_button("📥 Descargar Receta", r_pdf.output(dest='S').encode('latin-1'), f"Receta_{pac['nombre']}.pdf")
 
-    with t[6]:
-        st.subheader("📝 Nota de Evolución Rápida")
-        nota_hoy = st.text_area("Descripción de la evolución:", height=250, placeholder="Escriba aquí los cambios observados hoy...")
-        if st.button("💾 GENERAR NOTA (PDF)", use_container_width=True):
+    with t[6]: # EVOLUCIÓN
+        nota_hoy = st.text_area("Nota de hoy:", height=250)
+        if st.button("💾 DESCARGAR NOTA"):
             if nota_hoy:
                 e_pdf = CLINIC_PDF()
                 e_pdf.add_page()
@@ -193,5 +197,3 @@ if "paciente_actual" in st.session_state:
                 e_pdf.set_font("Arial", "", 11)
                 e_pdf.multi_cell(0, 9, nota_hoy)
                 st.download_button("📥 Descargar Nota", e_pdf.output(dest='S').encode('latin-1'), f"Nota_{pac['nombre']}.pdf")
-            else:
-                st.error("Por favor escriba la nota antes de generar el PDF.")
