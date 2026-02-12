@@ -1,4 +1,4 @@
-eimport streamlit as st
+import streamlit as st
 from fpdf import FPDF
 from datetime import date, datetime
 import io
@@ -113,7 +113,7 @@ if login_registro():
                 "motivo": "", "as_digestivo": "", "as_resp": "", "as_cardio": "", "as_neuro": "", 
                 "as_urinario": "", "as_piel": "", "as_musculo": "", "exploracion": "", 
                 "dx": "", "plan": "", "notas_evolucion": [],
-                "receta_texto": "" # Nuevo campo para receta
+                "receta_texto": "" 
             }
             st.session_state["paciente_seleccionado"] = p_id; st.rerun()
         
@@ -125,7 +125,6 @@ if login_registro():
         pac = st.session_state["lista_pacientes"][st.session_state["paciente_seleccionado"]]
         st.header(f"🧑‍⚕️ {pac['nombre'] if pac['nombre'] else 'Paciente Nuevo'}")
 
-        # AGREGADA PESTAÑA DE RECETA
         t = st.tabs(["📋 Filiación", "🧬 Antecedentes", "🫁 Sistemas", "🔍 Exploración", "📝 DX/Plan", "💊 Receta", "📈 Evolución"])
 
         with t[0]: # FILIACIÓN
@@ -162,130 +161,4 @@ if login_registro():
                 with col_a:
                     pac['as_digestivo'] = st.text_area("A. Digestivo:", value=pac['as_digestivo'], height=100)
                     pac['as_cardio'] = st.text_area("A. Cardiovascular:", value=pac['as_cardio'], height=100)
-                    pac['as_urinario'] = st.text_area("A. Genitourinario:", value=pac['as_urinario'], height=100)
-                with col_b:
-                    pac['as_resp'] = st.text_area("A. Respiratorio:", value=pac['as_resp'], height=100)
-                    pac['as_neuro'] = st.text_area("A. Neurológico:", value=pac['as_neuro'], height=100)
-                    pac['as_piel'] = st.text_area("Piel y Faneras:", value=pac['as_piel'], height=100)
-                pac['as_musculo'] = st.text_area("Músculo-Esquelético:", value=pac['as_musculo'], height=100)
-
-        with t[3]: # EXPLORACIÓN
-            with st.container(border=True):
-                pac['exploracion'] = st.text_area("Exploración Física:", value=pac['exploracion'], height=350)
-
-        with t[4]: # DX/PLAN
-            with st.container(border=True):
-                pac['dx'] = st.text_area("Impresión Diagnóstica:", value=pac['dx'], height=150)
-                pac['plan'] = st.text_area("Plan de Manejo:", value=pac['plan'], height=150)
-                
-                if st.button("🖨️ GENERAR HISTORIA COMPLETA", type="primary", use_container_width=True):
-                    pdf = PEDIATRIC_PDF()
-                    pdf.add_page()
-                    pdf.section_title("1. Datos de Filiación")
-                    pdf.add_field("Paciente", pac['nombre'])
-                    pdf.add_field("Edad/Sexo", f"{pac['edad']} / {pac['sexo']}")
-                    pdf.add_field("Nacimiento", pac['f_nac'])
-                    pdf.add_field("Interrogatorio", f"{pac['tipo_interrogatorio']} por {pac['informante']} ({pac['parentesco']})")
-                    pdf.section_title("2. Signos Vitales")
-                    pdf.add_field("Signos", f"FC: {pac['fc']} | FR: {pac['fr']} | SatO2: {pac['sat']} | Temp: {pac['temp']}")
-                    pdf.section_title("3. Antecedentes")
-                    pdf.add_field("Heredofamiliares", pac['ahf'])
-                    pdf.add_field("Prenatales/Natales", f"{pac['prenatales']} / {pac['natales']}")
-                    pdf.add_field("Desarrollo/Alimentación", f"{pac['desarrollo']} / {pac['alimentacion']}")
-                    pdf.add_field("Patológicos", pac['patologicos'])
-                    pdf.section_title("4. Padecimiento y Sistemas")
-                    pdf.add_field("Padecimiento Actual", pac['motivo'])
-                    pdf.add_field("Sistemas", f"Digestivo: {pac['as_digestivo']}\nRespiratorio: {pac['as_resp']}\nCardio: {pac['as_cardio']}\nNeuro: {pac['as_neuro']}")
-                    pdf.section_title("5. Exploración, Diagnóstico y Plan")
-                    pdf.add_field("Exploración Física", pac['exploracion'])
-                    pdf.add_field("Impresión Diagnóstica", pac['dx'])
-                    pdf.add_field("Plan de Manejo", pac['plan'])
-                    st.download_button("📥 Descargar Expediente Full PDF", pdf.output(dest='S').encode('latin-1'), f"HC_{pac['nombre']}.pdf", use_container_width=True)
-
-        with t[5]: # --- APARTADO DE RECETA (NUEVO) ---
-            with st.container(border=True):
-                st.subheader("💊 Prescripción Médica")
-                st.info("Escriba el medicamento, dosis, vía de administración y frecuencia.")
-                pac['receta_texto'] = st.text_area("Tratamiento:", value=pac.get('receta_texto', ""), height=250, placeholder="Ej: Paracetamol Jarabe 120mg/5ml. Dar 5ml cada 8 horas por 3 días...")
-                
-                if st.button("📄 GENERAR RECETA MÉDICA", type="primary", use_container_width=True):
-                    r_pdf = RECETA_PDF()
-                    r_pdf.add_page()
-                    r_pdf.set_font('Arial', 'B', 10)
-                    r_pdf.cell(130, 7, f"PACIENTE: {pac['nombre']}", 0, 0)
-                    r_pdf.cell(0, 7, f"FECHA: {date.today().strftime('%d/%m/%Y')}", 0, 1, 'R')
-                    r_pdf.set_font('Arial', '', 10)
-                    r_pdf.cell(0, 7, f"EDAD: {pac['edad']} | SEXO: {pac['sexo']} | PESO: {pac.get('peso', '---')} kg", 0, 1)
-                    r_pdf.ln(5)
-                    r_pdf.set_font('Arial', 'B', 11)
-                    r_pdf.cell(0, 7, "DIAGNÓSTICO:", 0, 1)
-                    r_pdf.set_font('Arial', '', 10)
-                    r_pdf.multi_cell(0, 6, pac['dx'] if pac['dx'] else "No especificado")
-                    r_pdf.ln(5)
-                    r_pdf.set_font('Arial', 'B', 12)
-                    r_pdf.cell(0, 10, "RP / PRESCRIPCIÓN:", 0, 1)
-                    r_pdf.set_font('Arial', '', 11)
-                    r_pdf.multi_cell(0, 8, pac['receta_texto'])
-                    st.download_button("📥 Descargar Receta (PDF)", r_pdf.output(dest='S').encode('latin-1'), f"Receta_{pac['nombre']}.pdf", use_container_width=True)
-                    with t[6]: # EVOLUCIÓN (Línea 231)
-            with st.container(border=True):
-                st.subheader("Notas de Evolución")
-                nueva = st.text_area("Nueva nota médica:", placeholder="Escriba la evolución del paciente...")
-                
-                if st.button("💾 Guardar Nota", use_container_width=True, type="primary"):
-                    if nueva:
-                        registro = {
-                            "f": datetime.now().strftime("%d/%m/%Y %H:%M"), 
-                            "t": nueva,
-                            "sv": f"FC: {pac['fc']} | FR: {pac['fr']} | Sat: {pac['sat']} | Temp: {pac['temp']}"
-                        }
-                        pac["notas_evolucion"].insert(0, registro)
-                        st.rerun()
-                
-                st.divider()
-                
-                if pac["notas_evolucion"]:
-                    if st.button("📄 GENERAR REPORTE DE EVOLUCIÓN", use_container_width=True):
-                        pdf_ev = PEDIATRIC_PDF()
-                        pdf_ev.add_page()
-                        pdf_ev.section_title("Reporte de Evolución Clínica")
-                        pdf_ev.add_field("Paciente", pac['nombre'])
-                        pdf_ev.add_field("Edad/Sexo", f"{pac['edad']} / {pac['sexo']}")
-                        
-                        for n in pac["notas_evolucion"]:
-                            pdf_ev.ln(2)
-                            pdf_ev.set_font('Arial', 'B', 10)
-                            pdf_ev.set_text_color(0, 51, 102)
-                            pdf_ev.cell(0, 7, f"FECHA: {n['f']}", 0, 1)
-                            pdf_ev.set_font('Arial', 'I', 9)
-                            pdf_ev.set_text_color(100, 100, 100)
-                            pdf_ev.cell(0, 5, f"SIGNOS: {n.get('sv', 'No registrados')}", 0, 1)
-                            pdf_ev.ln(1)
-                            pdf_ev.set_font('Arial', '', 10)
-                            pdf_ev.set_text_color(0, 0, 0)
-                            pdf_ev.multi_cell(0, 6, n['t'])
-                            pdf_ev.ln(2)
-                            pdf_ev.line(10, pdf_ev.get_y(), 200, pdf_ev.get_y())
-
-                        # Pie de página con firma
-                        pdf_ev.ln(10)
-                        pdf_ev.set_font('Arial', 'I', 8)
-                        pdf_ev.cell(0, 5, "__________________________________________", 0, 1, 'C')
-                        pdf_ev.cell(0, 5, f"Firma del Médico: {st.session_state['user_actual']}", 0, 1, 'C')
-                        
-                        st.download_button(
-                            label="📥 Descargar Notas de Evolución (PDF)",
-                            data=pdf_ev.output(dest='S').encode('latin-1'),
-                            file_name=f"Evolucion_{pac['nombre']}.pdf",
-                            mime="application/pdf",
-                            use_container_width=True
-                        )
-                
-                for n in pac["notas_evolucion"]: 
-                    st.info(f"📅 {n['f']} | {n.get('sv', '')}\n\n{n['t']}")
-
-
-
-
-
-
+                    pac['as_urin
