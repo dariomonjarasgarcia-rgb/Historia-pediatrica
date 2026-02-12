@@ -43,7 +43,7 @@ class CLINIC_PDF(FPDF):
         self.multi_cell(0, 7, text_val)
         self.ln(1)
 
-# --- SISTEMA DE USUARIOS Y AUTORIZACIÓN ---
+# --- SISTEMA DE USUARIOS Y AUTORIZACIÓN (AJUSTADO) ---
 def cargar_usuarios():
     if os.path.exists("usuarios.json"):
         with open("usuarios.json", "r") as f: return json.load(f)
@@ -56,22 +56,18 @@ def cargar_autorizados():
 
 def guardar_autorizados(lista):
     with open("autorizados.json", "w") as f: json.dump(lista, f)
-    st.session_state["lista_autorizados"] = lista
 
 def guardar_usuario(u, p):
     db = cargar_usuarios()
     db[u] = p
     with open("usuarios.json", "w") as f: json.dump(db, f)
-    st.session_state["db_usuarios"] = db
 
 # --- INICIALIZACIÓN ---
-if "db_usuarios" not in st.session_state: st.session_state["db_usuarios"] = cargar_usuarios()
-if "lista_autorizados" not in st.session_state: st.session_state["lista_autorizados"] = cargar_autorizados()
 if "lista_pacientes" not in st.session_state: st.session_state["lista_pacientes"] = {}
 if "datos_medico" not in st.session_state: st.session_state["datos_medico"] = "Dr. Dario Monjaras"
 if "sub_encabezado" not in st.session_state: st.session_state["sub_encabezado"] = "Pediatra Neonatólogo | Cédula: 1234567"
 
-# --- LOGIN ---
+# --- LOGIN (CON FILTRO DE AUTORIZACIÓN) ---
 if "autenticado" not in st.session_state:
     c1, c2, c3 = st.columns([1,2,1])
     with c2:
@@ -80,47 +76,48 @@ if "autenticado" not in st.session_state:
             modo = st.radio("Acción", ["Iniciar Sesión", "Registrarse"], horizontal=True)
             u = st.text_input("Usuario")
             p = st.text_input("Contraseña", type="password")
+            
             if modo == "Iniciar Sesión":
                 if st.button("Ingresar", use_container_width=True, type="primary"):
-                    if u in st.session_state["db_usuarios"] and st.session_state["db_usuarios"][u] == p:
-                        if u in st.session_state["lista_autorizados"]:
+                    db_actual = cargar_usuarios()
+                    auth_list = cargar_autorizados()
+                    if u in db_actual and db_actual[u] == p:
+                        if u in auth_list:
                             st.session_state["autenticado"] = True
                             st.session_state["usuario_actual"] = u
                             st.rerun()
                         else:
-                            st.error("⚠️ Tu cuenta está pendiente de autorización.")
+                            st.error("⚠️ Usuario registrado pero pendiente de autorización.")
                     else: st.error("Credenciales incorrectas")
             else:
                 if st.button("Crear Cuenta", use_container_width=True):
                     if u and p:
                         guardar_usuario(u, p)
-                        st.success("Usuario registrado. Espera a que el administrador autorice tu acceso.")
+                        st.success("Usuario registrado. El administrador debe autorizarte.")
     st.stop()
 
 # --- SIDEBAR MEJORADA ---
 with st.sidebar:
-    st.markdown(f"### 🩺 Usuario: {st.session_state.get('usuario_actual')}")
+    st.markdown(f"### 🩺 Dr. {st.session_state.get('usuario_actual')}")
     if st.button("🚪 CERRAR SESIÓN", use_container_width=True):
-        del st.session_state["autenticado"]
+        st.session_state.clear()
         st.rerun()
     st.divider()
 
-    # --- PANEL DE ADMINISTRACIÓN (SOLO PARA 'admin') ---
+    # --- PANEL SECRETO DE ADMINISTRADOR ---
     if st.session_state.get("usuario_actual") == "admin":
-        with st.expander("👑 AUTORIZAR USUARIOS", expanded=True):
-            usuarios_registrados = st.session_state["db_usuarios"]
-            lista_ok = st.session_state["lista_autorizados"]
-            for user in list(usuarios_registrados.keys()):
+        with st.expander("👑 PANEL DE ACTIVACIÓN", expanded=True):
+            db_admin = cargar_usuarios()
+            auth_list = cargar_autorizados()
+            for user in list(db_admin.keys()):
                 if user != "admin":
                     col_u, col_b = st.columns([2,1])
-                    check = "✅" if user in lista_ok else "⏳"
-                    col_u.write(f"{check} {user}")
-                    if col_b.button("OK", key=f"auth_{user}"):
-                        if user in lista_ok:
-                            lista_ok.remove(user)
-                        else:
-                            lista_ok.append(user)
-                        guardar_autorizados(lista_ok)
+                    status = "✅" if user in auth_list else "⏳"
+                    col_u.write(f"{status} {user}")
+                    if col_b.button("OK", key=f"btn_{user}"):
+                        if user in auth_list: auth_list.remove(user)
+                        else: auth_list.append(user)
+                        guardar_autorizados(auth_list)
                         st.rerun()
         st.divider()
     
