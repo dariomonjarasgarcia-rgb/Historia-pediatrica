@@ -10,6 +10,18 @@ from interface_premium import cargar_estilo_hospital
 st.set_page_config(page_title="Unidad Pediátrica", layout="wide", page_icon="🏥")
 cargar_estilo_hospital()
 
+# --- BLOQUE DE SEGURIDAD: OCULTAR MANAGE APP Y MENÚS ---
+hide_streamlit_style = """
+            <style>
+            #MainMenu {visibility: hidden;}
+            footer {visibility: hidden;}
+            header {visibility: hidden;}
+            .stAppDeployButton {display:none;}
+            [data-testid="stStatusWidget"] {visibility: hidden;}
+            </style>
+            """
+st.markdown(hide_streamlit_style, unsafe_allow_html=True)
+
 # --- MOTOR PDF PROFESIONAL ---
 class CLINIC_PDF(FPDF):
     def header(self):
@@ -79,10 +91,8 @@ if "autenticado" not in st.session_state:
             
             if modo == "Iniciar Sesión":
                 if st.button("Ingresar", use_container_width=True, type="primary"):
-                    # Lectura fresca de archivos para evitar errores de caché
                     db_actual = cargar_usuarios()
                     auth_list = cargar_autorizados()
-                    
                     if u_input in db_actual and db_actual[u_input] == p_input:
                         if u_input in auth_list:
                             st.session_state["autenticado"] = True
@@ -98,8 +108,7 @@ if "autenticado" not in st.session_state:
                         guardar_usuario(u_input, p_input)
                         st.success("Usuario registrado. Solicite autorización al administrador.")
     st.stop()
-
-# --- SIDEBAR MEJORADA ---
+    # --- SIDEBAR MEJORADA ---
 with st.sidebar:
     st.markdown(f"### 🩺 Sesión: {st.session_state.get('usuario_actual')}")
     if st.button("🚪 CERRAR SESIÓN", use_container_width=True):
@@ -199,8 +208,7 @@ if "paciente_actual" in st.session_state:
             pac['dx'], pac['plan'] = st.text_area("Impresión Diagnóstica:", value=pac['dx']), st.text_area("Plan Terapéutico:", value=pac['plan'])
         
         if st.button("🖨️ GENERAR EXPEDIENTE COMPLETO", type="primary", use_container_width=True):
-            pdf = CLINIC_PDF()
-            pdf.add_page()
+            pdf = CLINIC_PDF(); pdf.add_page()
             pdf.section_header("1. DATOS DE FILIACIÓN Y SOMATOMETRÍA")
             pdf.add_info("PACIENTE", pac['nombre'])
             pdf.add_info("SOMATOMETRÍA", f"Peso: {pac['peso']} kg | Talla: {pac['talla']} cm")
@@ -223,21 +231,17 @@ if "paciente_actual" in st.session_state:
     with t[5]: # RECETA
         pac['receta_texto'] = st.text_area("Instrucciones:", value=pac['receta_texto'], height=300)
         if st.button("📄 GENERAR RECETA PDF", type="primary", use_container_width=True):
-            r_pdf = CLINIC_PDF()
-            r_pdf.add_page()
-            r_pdf.ln(10)
+            r_pdf = CLINIC_PDF(); r_pdf.add_page(); r_pdf.ln(10)
             r_pdf.section_header(f"RECETA MÉDICA - {date.today().strftime('%d/%m/%Y')}")
             r_pdf.add_info("PACIENTE", pac['nombre']); r_pdf.add_info("PESO", f"{pac['peso']} kg")
-            r_pdf.ln(5)
-            r_pdf.set_font("Arial", "", 12); r_pdf.multi_cell(0, 10, pac['receta_texto'])
+            r_pdf.ln(5); r_pdf.set_font("Arial", "", 12); r_pdf.multi_cell(0, 10, pac['receta_texto'])
             st.download_button("📥 Descargar Receta", r_pdf.output(dest='S').encode('latin-1'), f"Receta_{pac['nombre']}.pdf")
 
     with t[6]: # EVOLUCIÓN
         nota_hoy = st.text_area("Nota de hoy:", height=250)
         if st.button("💾 DESCARGAR NOTA"):
             if nota_hoy:
-                e_pdf = CLINIC_PDF()
-                e_pdf.add_page()
+                e_pdf = CLINIC_PDF(); e_pdf.add_page()
                 e_pdf.section_header(f"NOTA DE EVOLUCIÓN - {datetime.now().strftime('%d/%m/%Y %H:%M')}")
                 e_pdf.add_info("PACIENTE", pac['nombre'])
                 e_pdf.add_info("SIGNOS", f"FC: {pac['fc']} | FR: {pac['fr']} | T: {pac['temp']}°C")
