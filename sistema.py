@@ -1,4 +1,12 @@
 import streamlit as st
+# 1. IMPORTA LAS FUNCIONES QUE ACABAMOS DE CREAR
+from interface_premium import cargar_estilo_hospital, render_sidebar_hospital
+
+# 2. APLICA EL ESTILO (Ponlo justo después de los imports)
+cargar_estilo_hospital()
+
+# 3. DIBUJA EL SIDEBAR
+render_sidebar_hospital("Dr(a). D")import streamlit as st
 from fpdf import FPDF
 from datetime import date, datetime
 import io
@@ -229,3 +237,4 @@ if login_registro():
             
             for n in pac["notas_evolucion"]:
                 st.info(f"📅 {n['f']}\n{n['t']}")
+
