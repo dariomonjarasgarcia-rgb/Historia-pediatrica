@@ -10,7 +10,7 @@ from interface_premium import cargar_estilo_hospital
 st.set_page_config(page_title="Unidad Pediátrica", layout="wide", page_icon="🏥")
 cargar_estilo_hospital()
 
-# --- MOTOR PDF PROFESIONAL (TU VERSIÓN ORIGINAL) ---
+# --- MOTOR PDF PROFESIONAL ---
 class CLINIC_PDF(FPDF):
     def header(self):
         self.set_fill_color(240, 245, 250)
@@ -43,19 +43,30 @@ class CLINIC_PDF(FPDF):
         self.multi_cell(0, 7, text_val)
         self.ln(1)
 
-# --- SISTEMA DE USUARIOS CON PANEL DE ACTIVACIÓN ---
+# --- SISTEMA DE USUARIOS Y AUTORIZACIÓN ---
 def cargar_usuarios():
-    if os.path.exists("usuarios_v4.json"):
-        with open("usuarios_v4.json", "r") as f: return json.load(f)
-    # Usuario administrador por defecto
-    return {"admin": {"pass": "medico2026", "role": "Admin", "activo": True}}
+    if os.path.exists("usuarios.json"):
+        with open("usuarios.json", "r") as f: return json.load(f)
+    return {"admin": "medico2026"}
 
-def guardar_db(db):
-    with open("usuarios_v4.json", "w") as f: json.dump(db, f)
+def cargar_autorizados():
+    if os.path.exists("autorizados.json"):
+        with open("autorizados.json", "r") as f: return json.load(f)
+    return ["admin"]
+
+def guardar_autorizados(lista):
+    with open("autorizados.json", "w") as f: json.dump(lista, f)
+    st.session_state["lista_autorizados"] = lista
+
+def guardar_usuario(u, p):
+    db = cargar_usuarios()
+    db[u] = p
+    with open("usuarios.json", "w") as f: json.dump(db, f)
     st.session_state["db_usuarios"] = db
 
 # --- INICIALIZACIÓN ---
 if "db_usuarios" not in st.session_state: st.session_state["db_usuarios"] = cargar_usuarios()
+if "lista_autorizados" not in st.session_state: st.session_state["lista_autorizados"] = cargar_autorizados()
 if "lista_pacientes" not in st.session_state: st.session_state["lista_pacientes"] = {}
 if "datos_medico" not in st.session_state: st.session_state["datos_medico"] = "Dr. Dario Monjaras"
 if "sub_encabezado" not in st.session_state: st.session_state["sub_encabezado"] = "Pediatra Neonatólogo | Cédula: 1234567"
@@ -69,27 +80,21 @@ if "autenticado" not in st.session_state:
             modo = st.radio("Acción", ["Iniciar Sesión", "Registrarse"], horizontal=True)
             u = st.text_input("Usuario")
             p = st.text_input("Contraseña", type="password")
-            
-            db = st.session_state["db_usuarios"]
-            
             if modo == "Iniciar Sesión":
                 if st.button("Ingresar", use_container_width=True, type="primary"):
-                    if u in db and db[u]["pass"] == p:
-                        if db[u].get("activo", False):
+                    if u in st.session_state["db_usuarios"] and st.session_state["db_usuarios"][u] == p:
+                        if u in st.session_state["lista_autorizados"]:
                             st.session_state["autenticado"] = True
                             st.session_state["usuario_actual"] = u
-                            st.session_state["rol_actual"] = db[u]["role"]
                             st.rerun()
-                        else: st.error("⚠️ Tu cuenta está pendiente de activación por el Admin.")
+                        else:
+                            st.error("⚠️ Tu cuenta está pendiente de autorización.")
                     else: st.error("Credenciales incorrectas")
             else:
                 if st.button("Crear Cuenta", use_container_width=True):
                     if u and p:
-                        if u not in db:
-                            db[u] = {"pass": p, "role": "User", "activo": False}
-                            guardar_db(db)
-                            st.success("Registro enviado. Pide al administrador que active tu acceso.")
-                        else: st.warning("El usuario ya existe.")
+                        guardar_usuario(u, p)
+                        st.success("Usuario registrado. Espera a que el administrador autorice tu acceso.")
     st.stop()
 
 # --- SIDEBAR MEJORADA ---
@@ -99,19 +104,23 @@ with st.sidebar:
         del st.session_state["autenticado"]
         st.rerun()
     st.divider()
-    
-    # --- PANEL MAESTRO (SOLO PARA EL ADMIN) ---
-    if st.session_state.get("rol_actual") == "Admin":
-        with st.expander("👑 PANEL DE ACTIVACIÓN", expanded=True):
-            db = st.session_state["db_usuarios"]
-            for user, info in list(db.items()):
-                if user != "admin": # No desactivar al admin principal
+
+    # --- PANEL DE ADMINISTRACIÓN (SOLO PARA 'admin') ---
+    if st.session_state.get("usuario_actual") == "admin":
+        with st.expander("👑 AUTORIZAR USUARIOS", expanded=True):
+            usuarios_registrados = st.session_state["db_usuarios"]
+            lista_ok = st.session_state["lista_autorizados"]
+            for user in list(usuarios_registrados.keys()):
+                if user != "admin":
                     col_u, col_b = st.columns([2,1])
-                    estado = "✅" if info["activo"] else "⏳"
-                    col_u.write(f"{estado} {user}")
-                    if col_b.button("Activar", key=f"btn_{user}"):
-                        db[user]["activo"] = not db[user]["activo"]
-                        guardar_db(db)
+                    check = "✅" if user in lista_ok else "⏳"
+                    col_u.write(f"{check} {user}")
+                    if col_b.button("OK", key=f"auth_{user}"):
+                        if user in lista_ok:
+                            lista_ok.remove(user)
+                        else:
+                            lista_ok.append(user)
+                        guardar_autorizados(lista_ok)
                         st.rerun()
         st.divider()
     
@@ -132,7 +141,7 @@ with st.sidebar:
         st.session_state["datos_medico"] = st.text_input("Nombre en PDF:", st.session_state["datos_medico"])
         st.session_state["sub_encabezado"] = st.text_area("Cédula / Especialidad:", st.session_state["sub_encabezado"])
 
-# --- PANEL PRINCIPAL (ESTRUCTURA ORIGINAL RECUPERADA) ---
+# --- PANEL PRINCIPAL ---
 if "paciente_actual" in st.session_state:
     p_id = st.session_state["paciente_actual"]
     if p_id not in st.session_state["lista_pacientes"]:
