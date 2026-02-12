@@ -7,7 +7,8 @@ import os
 from interface_premium import cargar_estilo_hospital
 
 # --- CONFIGURACIÓN ---
-st.set_page_config(page_title="Gestión Hospitalaria Pediátrica", layout="wide", page_icon="🏥")
+NOMBRE_APP = "Unidad Pediátrica" 
+st.set_page_config(page_title=NOMBRE_APP, layout="wide", page_icon="🏥")
 cargar_estilo_hospital()
 
 # --- PERSISTENCIA USUARIOS ---
@@ -21,7 +22,7 @@ def guardar_usuario(u, p):
     db[u] = p
     with open("usuarios.json", "w") as f: json.dump(db, f)
 
-# --- MOTOR PDF ---
+# --- MOTOR PDF PROFESIONAL (EXTENDIDO) ---
 class PEDIATRIC_PDF(FPDF):
     def header(self):
         self.set_font('Arial', 'B', 16)
@@ -45,7 +46,10 @@ class PEDIATRIC_PDF(FPDF):
         self.write(6, f"{label}: ")
         self.set_font('Arial', '', 9)
         self.set_text_color(0, 0, 0)
-        self.write(6, f"{str(value)}\n")
+        # Manejo de campos vacíos para el PDF
+        val = str(value) if value else "No referido"
+        self.multi_cell(0, 6, val)
+        self.ln(1)
 
 # --- LOGIN / REGISTRO ---
 def login_registro():
@@ -73,9 +77,10 @@ def login_registro():
         return False
     return True
 
-# --- APP ---
+# --- INICIO DE LA APP ---
 if login_registro():
     with st.sidebar:
+        st.markdown(f"### 🏥 {NOMBRE_APP}")
         st.write(f"🩺 Dr(a). **{st.session_state['user_actual']}**")
         if st.button("🚪 Cerrar Sesión", use_container_width=True):
             del st.session_state["password_correct"]; st.rerun()
@@ -119,44 +124,76 @@ if login_registro():
                 s1, s2, s3, s4 = st.columns(4)
                 pac['fc'], pac['fr'], pac['sat'], pac['temp'] = s1.text_input("FC:", value=pac['fc']), s2.text_input("FR:", value=pac['fr']), s3.text_input("SatO2:", value=pac['sat']), s4.text_input("Temp:", value=pac['temp'])
 
-        with t[1]: # ANTECEDENTES (CAJAS MÁS EXTENSAS)
+        with t[1]: # ANTECEDENTES
             with st.container(border=True):
                 st.subheader("Antecedentes del Paciente")
-                pac['ahf'] = st.text_area("Heredofamiliares:", value=pac['ahf'], height=100)
-                pac['prenatales'] = st.text_area("Prenatales:", value=pac['prenatales'], height=100)
-                pac['natales'] = st.text_area("Natales (Parto):", value=pac['natales'], height=100)
-                pac['vacunas'] = st.text_area("Vacunas y Tamiz:", value=pac['vacunas'], height=100)
-                pac['alimentacion'] = st.text_area("Alimentación:", value=pac['alimentacion'], height=100)
-                pac['desarrollo'] = st.text_area("Hitos del Desarrollo:", value=pac['desarrollo'], height=100)
-                pac['patologicos'] = st.text_area("Patológicos, Alergias y Qx:", value=pac['patologicos'], height=100)
+                pac['ahf'] = st.text_area("Heredofamiliares:", value=pac['ahf'], height=120)
+                pac['prenatales'] = st.text_area("Prenatales:", value=pac['prenatales'], height=120)
+                pac['natales'] = st.text_area("Natales (Parto):", value=pac['natales'], height=120)
+                pac['vacunas'] = st.text_area("Vacunas y Tamiz:", value=pac['vacunas'], height=120)
+                pac['alimentacion'] = st.text_area("Alimentación:", value=pac['alimentacion'], height=120)
+                pac['desarrollo'] = st.text_area("Hitos del Desarrollo:", value=pac['desarrollo'], height=120)
+                pac['patologicos'] = st.text_area("Patológicos y Alergias:", value=pac['patologicos'], height=120)
 
-        with t[2]: # SISTEMAS (REINTEGRACIÓN TOTAL)
+        with t[2]: # SISTEMAS
             with st.container(border=True):
                 pac['motivo'] = st.text_area("Padecimiento Actual:", value=pac['motivo'], height=150)
                 st.divider()
                 st.subheader("Interrogatorio por Aparatos y Sistemas")
                 col_a, col_b = st.columns(2)
                 with col_a:
-                    pac['as_digestivo'] = st.text_area("A. Digestivo:", value=pac['as_digestivo'])
-                    pac['as_cardio'] = st.text_area("A. Cardiovascular:", value=pac['as_cardio'])
-                    pac['as_urinario'] = st.text_area("A. Genitourinario:", value=pac['as_urinario'])
+                    pac['as_digestivo'] = st.text_area("A. Digestivo:", value=pac['as_digestivo'], height=100)
+                    pac['as_cardio'] = st.text_area("A. Cardiovascular:", value=pac['as_cardio'], height=100)
+                    pac['as_urinario'] = st.text_area("A. Genitourinario:", value=pac['as_urinario'], height=100)
                 with col_b:
-                    pac['as_resp'] = st.text_area("A. Respiratorio:", value=pac['as_resp'])
-                    pac['as_neuro'] = st.text_area("A. Neurológico:", value=pac['as_neuro'])
-                    pac['as_piel'] = st.text_area("Piel y Faneras:", value=pac['as_piel'])
-                pac['as_musculo'] = st.text_area("Músculo-Esquelético:", value=pac['as_musculo'])
+                    pac['as_resp'] = st.text_area("A. Respiratorio:", value=pac['as_resp'], height=100)
+                    pac['as_neuro'] = st.text_area("A. Neurológico:", value=pac['as_neuro'], height=100)
+                    pac['as_piel'] = st.text_area("Piel y Faneras:", value=pac['as_piel'], height=100)
+                pac['as_musculo'] = st.text_area("Músculo-Esquelético:", value=pac['as_musculo'], height=100)
 
         with t[3]: # EXPLORACIÓN
             with st.container(border=True):
-                pac['exploracion'] = st.text_area("Exploración Física Cefalocaudal:", value=pac['exploracion'], height=300)
+                pac['exploracion'] = st.text_area("Exploración Física:", value=pac['exploracion'], height=350)
 
-        with t[4]: # DX/PLAN
+        with t[4]: # DX/PLAN (PDF ACTUALIZADO AQUÍ)
             with st.container(border=True):
-                pac['dx'], pac['plan'] = st.text_area("Impresión Diagnóstica:", value=pac['dx'], height=150), st.text_area("Plan de Manejo:", value=pac['plan'], height=150)
+                pac['dx'] = st.text_area("Impresión Diagnóstica:", value=pac['dx'], height=150)
+                pac['plan'] = st.text_area("Plan de Manejo:", value=pac['plan'], height=150)
+                
                 if st.button("🖨️ GENERAR HISTORIA COMPLETA", type="primary", use_container_width=True):
-                    pdf = PEDIATRIC_PDF(); pdf.add_page(); pdf.section_title("Historia Clínica")
-                    pdf.add_field("Paciente", pac['nombre']); pdf.add_field("DX", pac['dx'])
-                    st.download_button("📥 Descargar PDF", pdf.output(dest='S').encode('latin-1'), f"HC_{pac['nombre']}.pdf", use_container_width=True)
+                    pdf = PEDIATRIC_PDF()
+                    pdf.add_page()
+                    
+                    # 1. FILIACIÓN
+                    pdf.section_title("1. Datos de Filiación")
+                    pdf.add_field("Paciente", pac['nombre'])
+                    pdf.add_field("Edad/Sexo", f"{pac['edad']} / {pac['sexo']}")
+                    pdf.add_field("Nacimiento", pac['f_nac'])
+                    pdf.add_field("Interrogatorio", f"{pac['tipo_interrogatorio']} por {pac['informante']} ({pac['parentesco']})")
+                    
+                    # 2. SIGNOS
+                    pdf.section_title("2. Signos Vitales")
+                    pdf.add_field("Signos", f"FC: {pac['fc']} | FR: {pac['fr']} | SatO2: {pac['sat']} | Temp: {pac['temp']}")
+                    
+                    # 3. ANTECEDENTES
+                    pdf.section_title("3. Antecedentes")
+                    pdf.add_field("Heredofamiliares", pac['ahf'])
+                    pdf.add_field("Prenatales/Natales", f"{pac['prenatales']} / {pac['natales']}")
+                    pdf.add_field("Desarrollo/Alimentación", f"{pac['desarrollo']} / {pac['alimentacion']}")
+                    pdf.add_field("Patológicos", pac['patologicos'])
+                    
+                    # 4. SISTEMAS
+                    pdf.section_title("4. Padecimiento y Sistemas")
+                    pdf.add_field("Padecimiento Actual", pac['motivo'])
+                    pdf.add_field("Sistemas", f"Digestivo: {pac['as_digestivo']}\nRespiratorio: {pac['as_resp']}\nCardio: {pac['as_cardio']}\nNeuro: {pac['as_neuro']}")
+                    
+                    # 5. EXPLORACIÓN Y PLAN
+                    pdf.section_title("5. Exploración, Diagnóstico y Plan")
+                    pdf.add_field("Exploración Física", pac['exploracion'])
+                    pdf.add_field("Impresión Diagnóstica", pac['dx'])
+                    pdf.add_field("Plan de Manejo", pac['plan'])
+                    
+                    st.download_button("📥 Descargar Expediente Full PDF", pdf.output(dest='S').encode('latin-1'), f"HC_{pac['nombre']}.pdf", use_container_width=True)
 
         with t[5]: # EVOLUCIÓN
             with st.container(border=True):
@@ -167,3 +204,4 @@ if login_registro():
                         pac["notas_evolucion"].insert(0, {"f": datetime.now().strftime("%d/%m/%Y %H:%M"), "t": nueva})
                         st.rerun()
                 for n in pac["notas_evolucion"]: st.info(f"📅 {n['f']}\n{n['t']}")
+                    
